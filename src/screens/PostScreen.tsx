@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
-import { Text, TextInput, Button, useTheme, SegmentedButtons, IconButton, Surface } from 'react-native-paper';
+import { Text, TextInput, Button, useTheme, SegmentedButtons, IconButton, Surface, Portal, Modal, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInDown, FadeIn, SlideInRight } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
+import { useNavigation } from '@react-navigation/native';
+import { postService } from '../services/postService';
 
 const PostScreen = () => {
   const theme = useTheme();
+  const navigation = useNavigation();
   const [postType, setPostType] = useState('service');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [error, setError] = useState('');
 
   const handleImagePick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -77,6 +83,64 @@ const PostScreen = () => {
         </ScrollView>
       </View>
     );
+  };
+
+  const handleSubmit = async () => {
+    if (!title.trim() || !description.trim()) {
+      setError('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const postData = {
+        category: postType,
+        description: description.trim(),
+        requestor: {
+          id: 'user123', // À remplacer par l'ID de l'utilisateur connecté
+          name: 'Utilisateur', // À remplacer par le nom de l'utilisateur connecté
+        },
+        location: {
+          address: '',
+          coordinates: {
+            latitude: 0,
+            longitude: 0,
+          }
+        },
+        status: 'active' as const,
+        title: title.trim(),
+      };
+
+      // Préparer les images pour l'upload
+      const photoFiles = images.map(image => ({
+        uri: Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri,
+        type: 'image/jpeg',
+        name: `photo_${Date.now()}.jpg`
+      }));
+
+      const createdPost = await postService.createPost(postData, photoFiles.length > 0 ? photoFiles : undefined);
+      console.log('Post créé avec succès:', createdPost);
+      
+      setShowSuccessModal(true);
+      
+      // Réinitialiser le formulaire
+      setTitle('');
+      setDescription('');
+      setImages([]);
+      
+      // Attendre 2 secondes avant de rediriger
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        navigation.navigate('Home');
+      }, 2000);
+    } catch (err) {
+      console.error('Erreur détaillée lors de la création du post:', err);
+      setError(err.message || 'Une erreur est survenue lors de la création de votre annonce');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -163,16 +227,44 @@ const PostScreen = () => {
           entering={FadeInDown.duration(500).delay(400)}
           style={styles.footer}
         >
+          {error ? (
+            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+              {error}
+            </Text>
+          ) : null}
+          
           <Button 
             mode="contained"
-            onPress={() => {}}
+            onPress={handleSubmit}
             style={styles.submitButton}
             contentStyle={styles.submitButtonContent}
+            disabled={loading}
           >
-            Publier l'annonce
+            {loading ? 'Publication en cours...' : 'Publier l\'annonce'}
           </Button>
         </Animated.View>
       </KeyboardAvoidingView>
+
+      <Portal>
+        <Modal
+          visible={showSuccessModal}
+          dismissable={false}
+          contentContainerStyle={[
+            styles.modal,
+            { backgroundColor: theme.colors.surface }
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="check-circle"
+            size={64}
+            color={theme.colors.primary}
+          />
+          <Text variant="headlineSmall" style={styles.modalText}>
+            Annonce publiée avec succès !
+          </Text>
+          <ActivityIndicator animating={true} color={theme.colors.primary} />
+        </Modal>
+      </Portal>
     </SafeAreaView>
   );
 };
@@ -265,6 +357,20 @@ const styles = StyleSheet.create({
   },
   submitButtonContent: {
     paddingVertical: 8,
+  },
+  errorText: {
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modal: {
+    padding: 20,
+    margin: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalText: {
+    marginVertical: 16,
+    textAlign: 'center',
   },
 });
 
