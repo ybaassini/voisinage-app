@@ -110,34 +110,74 @@ const fontConfig = {
 
 export const theme = {
   ...MD3LightTheme,
+  fonts: configureFonts({ config: fontConfig }),
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#1E88E5', // Bleu moderne
-    primaryContainer: '#E3F2FD',
-    secondary: '#00897B', // Vert-bleu
-    secondaryContainer: '#E0F2F1',
-    tertiary: '#5C6BC0', // Indigo
-    tertiaryContainer: '#E8EAF6',
-    error: '#D32F2F',
-    errorContainer: '#FFEBEE',
-    background: '#FAFAFA',
-    surface: '#FFFFFF',
-    surfaceVariant: '#F5F5F5',
-    outline: '#BDBDBD',
-    elevation: {
-      level0: 'transparent',
-      level1: '#FFFFFF',
-      level2: '#F5F5F5',
-      level3: '#EEEEEE',
-      level4: '#E0E0E0',
-      level5: '#BDBDBD',
-    },
+    // Couleurs principales
+    primary: '#FF7021',
+    primaryContainer: '#FFE0B2',
+    onPrimary: '#FFFFFF',
+    onPrimaryContainer: '#F57C00',
+    
+    // Couleurs secondaires
+    secondary: '#4CAF50',
+    secondaryContainer: '#C8E6C9',
+    onSecondary: '#FFFFFF',
+    onSecondaryContainer: '#2E7D32',
+    
+    // Couleurs d'accentuation
+    tertiary: '#2196F3',
+    tertiaryContainer: '#BBDEFB',
+    onTertiary: '#FFFFFF',
+    onTertiaryContainer: '#1976D2',
+    
+    // Couleurs de surface et de fond
+    background: '#F0F2F5', // Fond gris clair
+    onBackground: '#212121',
+    surface: '#FFFFFF', // Surface blanche pour les cartes et éléments
+    surfaceVariant: '#FFFFFF', // Surface alternative aussi en blanc
+    onSurface: '#212121',
+    onSurfaceVariant: '#757575',
+    surfaceDisabled: '#F5F5F5',
+    
+    // Couleurs d'erreur
+    error: '#F44336',
+    errorContainer: '#FFCDD2',
+    onError: '#FFFFFF',
+    onErrorContainer: '#D32F2F',
+    
+    // Couleurs pour les cartes et éléments d'interface
+    cardBackground: '#FFFFFF', // Cartes en blanc pour contraster avec le fond
+    divider: '#E0E0E0', // Séparateurs légèrement plus visibles
+    border: '#E0E0E0',
+    placeholder: '#9E9E9E',
+    
+    // Couleurs pour le texte
+    textPrimary: '#212121',
+    textSecondary: '#757575',
+    textDisabled: '#9E9E9E',
+    
+    // Couleurs pour les boutons
+    buttonPrimary: '#FF9800',
+    buttonSecondary: '#FFFFFF', // Boutons secondaires en blanc
+    buttonDisabled: '#BDBDBD',
+    
+    // Couleurs pour les états
+    active: '#FF9800',
+    inactive: '#9E9E9E',
+    hover: '#FFF3E0',
+    pressed: '#F57C00',
+    focus: '#FFE0B2',
+    
+    // Couleurs pour les badges et étiquettes
+    badge: '#F44336',
+    tag: '#FFFFFF', // Tags en blanc
+    
+    // Couleurs pour les évaluations
+    rating: '#FFC107',
+    ratingInactive: '#E0E0E0',
   },
-  roundness: 12,
-  fonts: configureFonts({ config: fontConfig }),
-  animation: {
-    scale: 1.0,
-  },
+  // Ajout de styles pour les élévations
   elevation: {
     level0: {
       shadowColor: '#000',
@@ -148,38 +188,42 @@ export const theme = {
     },
     level1: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
+      shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.15,
-      shadowRadius: 3.84,
+      shadowRadius: 2.0,
       elevation: 2,
     },
     level2: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.20,
-      shadowRadius: 5.23,
-      elevation: 4,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.18,
+      shadowRadius: 3.0,
+      elevation: 3,
     },
     level3: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 6.27,
-      elevation: 6,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.20,
+      shadowRadius: 4.0,
+      elevation: 4,
     },
     level4: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 5 },
-      shadowOpacity: 0.30,
-      shadowRadius: 7.49,
-      elevation: 8,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.22,
+      shadowRadius: 5.0,
+      elevation: 5,
     },
     level5: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.35,
-      shadowRadius: 8.79,
-      elevation: 10,
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.25,
+      shadowRadius: 6.0,
+      elevation: 6,
     },
   },
+  // Ajustement de l'arrondi pour plus de modernité
+  roundness: 12,
 };
+
+export type AppTheme = typeof theme;

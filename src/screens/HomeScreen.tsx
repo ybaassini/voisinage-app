@@ -3,12 +3,24 @@ import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { Text, Card, Chip, useTheme, Searchbar, IconButton, Surface, Avatar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useNavigation } from '@react-navigation/native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { TouchableOpacity } from 'react-native';
+import TimeAgo from '../components/TimeAgo';
 
 const HomeScreen = ({ navigation }: any) => {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [likedPosts, setLikedPosts] = useState<{ [key: string]: boolean }>({});
+
+  const handleLike = (postId: string) => {
+    setLikedPosts(prev => ({
+      ...prev,
+      [postId]: !prev[postId]
+    }));
+  };
 
   const categories = [
     { id: 'all', label: 'Tout', icon: 'view-grid' },
@@ -24,22 +36,30 @@ const HomeScreen = ({ navigation }: any) => {
       title: 'Prêt de perceuse professionnelle',
       description: 'Perceuse Bosch Professional disponible pour prêt ce weekend. Idéale pour les travaux de rénovation.',
       category: 'Outils',
-      user: 'Marie D.',
-      avatar: 'MD',
+      user: {
+        name: 'Marie D.',
+        avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
+        rating: 4.8,
+      },
       rating: 4.8,
       distance: '200m',
-      image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c',
+      timestamp: new Date().getTime(),
+      responses: [],
     },
     {
       id: '2',
       title: 'Cours de guitare personnalisés',
       description: 'Je propose des cours de guitare pour débutants. Apprentissage adapté à votre niveau et à vos objectifs.',
       category: 'Services',
-      user: 'Pierre M.',
-      avatar: 'PM',
+      user: {
+        name: 'Pierre M.',
+        avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
+        rating: 4.9,
+      },
       rating: 4.9,
       distance: '500m',
-      image: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1',
+      timestamp: new Date().getTime(),
+      responses: [],
     },
   ];
 
@@ -56,95 +76,122 @@ const HomeScreen = ({ navigation }: any) => {
       entering={FadeInDown.delay(index * 100).springify()}
       style={styles.cardContainer}
     >
-      <Card style={[styles.card, { elevation: 1 }]}>
-        {item.image && (
-          <Card.Cover source={{ uri: item.image }} style={styles.cardImage} />
-        )}
-        <Card.Content style={styles.cardContent}>
-          <View style={styles.cardHeader}>
-            <Avatar.Text
-              size={36}
-              label={item.avatar}
-              style={{ backgroundColor: theme.colors.primaryContainer }}
-              color={theme.colors.primary}
-            />
-            <View style={styles.userInfo}>
-              <Text variant="titleMedium" style={styles.userName}>{item.user}</Text>
-              <View style={styles.ratingContainer}>
-                <IconButton
-                  icon="star"
-                  size={16}
-                  iconColor={theme.colors.primary}
-                  style={styles.ratingIcon}
+      <Card 
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.colors.surface,
+            elevation: 2,
+            shadowColor: '#000',
+            shadowOffset: {
+              width: 0,
+              height: 2,
+            },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+          }
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.navigate('PostDetail', { post: item })}
+        >
+          <Card.Content style={styles.cardContent}>
+            <View style={styles.cardHeader}>
+              <View style={styles.userInfo}>
+                <Avatar.Image 
+                  size={40} 
+                  source={{ uri: item.user.avatar }} 
                 />
-                <Text variant="bodySmall">{item.rating}</Text>
-                <Text variant="bodySmall" style={styles.distance}>• {item.distance}</Text>
+                <View style={styles.userInfoText}>
+                  <Text variant="titleMedium">{item.user.name}</Text>
+                  {item.user.rating !== undefined && (
+                    <View style={styles.ratingContainer}>
+                      <MaterialCommunityIcons 
+                        name="star" 
+                        size={16} 
+                        color={theme.colors.primary} 
+                      />
+                      <Text style={styles.rating}>
+                        {item.user.rating.toFixed(1)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <TimeAgo date={new Date(item.timestamp)} style={{ color: theme.colors.onSurfaceVariant, alignSelf: 'flex-end' }} />
+            </View>
+
+            <Text variant="titleLarge" style={styles.title}>
+              {item.title}
+            </Text>
+            <Text variant="bodyMedium" numberOfLines={2} style={styles.description}>
+              {item.description}
+            </Text>
+
+            <View style={styles.footer}>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                {new Date(item.timestamp).toLocaleDateString()}
+              </Text>
+              <View style={styles.stats}>
+                <View style={styles.stat}>
+                  <MaterialCommunityIcons 
+                    name="message-outline" 
+                    size={16} 
+                    color={theme.colors.onSurfaceVariant} 
+                  />
+                  <Text style={[styles.statText, { color: theme.colors.onSurfaceVariant }]}>
+                    {item.responses?.length || 0}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
+          </Card.Content>
+        </TouchableOpacity>
 
-          <Text variant="titleLarge" style={styles.title}>{item.title}</Text>
-          <Text variant="bodyMedium" style={styles.description}>{item.description}</Text>
-
-          <View style={styles.cardFooter}>
-            <Chip
-              icon={categories.find(cat => cat.label === item.category)?.icon}
-              style={[styles.categoryChip, { backgroundColor: theme.colors.primaryContainer }]}
-              textStyle={{ color: theme.colors.primary }}
+        <Card.Actions style={styles.actionBanner}>
+          <View style={styles.actionLeft}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleLike(item.id)}
             >
-              {item.category}
-            </Chip>
-            <IconButton
-              icon="message-outline"
-              size={20}
-              onPress={() => {}}
-              style={styles.messageButton}
-            />
+              <MaterialCommunityIcons
+                name={likedPosts[item.id] ? "heart" : "heart-outline"}
+                size={24}
+                color={likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant}
+              />
+              <Text
+                style={[
+                  styles.actionText,
+                  { color: likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant }
+                ]}
+              >
+                J'aime
+              </Text>
+            </TouchableOpacity>
           </View>
-        </Card.Content>
+
+          <View style={styles.actionRight}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('Chat')}
+            >
+              <MaterialCommunityIcons
+                name="message-reply-text-outline"
+                size={24}
+                color={theme.colors.primary}
+              />
+              <Text style={[styles.actionText, { color: theme.colors.primary }]}>
+                Répondre
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Card.Actions>
       </Card>
     </Animated.View>
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Surface style={styles.header} elevation={1}>
-        <Searchbar
-          placeholder="Rechercher..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={styles.searchbar}
-          elevation={0}
-          mode="bar"
-        />
-      </Surface>
-
-      <View style={styles.categoriesContainer}>
-        <FlatList
-          horizontal
-          data={categories}
-          keyExtractor={(item) => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-          renderItem={({ item }) => (
-            <Chip
-              icon={item.icon}
-              selected={selectedCategory === item.id}
-              onPress={() => setSelectedCategory(item.id === selectedCategory ? null : item.id)}
-              style={[
-                styles.categoryChip,
-                {
-                  backgroundColor: selectedCategory === item.id
-                    ? theme.colors.primaryContainer
-                    : theme.colors.surfaceVariant,
-                }
-              ]}
-            >
-              {item.label}
-            </Chip>
-          )}
-        />
-      </View>
 
       <FlatList
         data={mockAnnouncements}
@@ -160,18 +207,6 @@ const HomeScreen = ({ navigation }: any) => {
           />
         }
       />
-
-      <IconButton
-        icon="plus"
-        mode="contained"
-        size={24}
-        onPress={() => navigation.navigate('Post')}
-        style={[
-          styles.fab,
-          { backgroundColor: theme.colors.primary }
-        ]}
-        iconColor={theme.colors.surface}
-      />
     </SafeAreaView>
   );
 };
@@ -180,63 +215,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  searchbar: {
-    borderRadius: 12,
-  },
-  categoriesContainer: {
-    marginVertical: 8,
-  },
-  categoriesList: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  categoryChip: {
-    marginRight: 8,
-    borderRadius: 20,
-  },
   list: {
     padding: 16,
-    paddingBottom: 80,
+    backgroundColor: '#F5F5F5',
   },
   cardContainer: {
     marginBottom: 16,
   },
   card: {
-    borderRadius: 16,
     overflow: 'hidden',
-  },
-  cardImage: {
-    height: 200,
+    borderRadius: 12,
   },
   cardContent: {
     padding: 16,
   },
   cardHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
   userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userInfoText: {
     marginLeft: 8,
     flex: 1,
-  },
-  userName: {
-    fontWeight: '500',
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  ratingIcon: {
-    margin: 0,
-    marginLeft: -8,
-  },
-  distance: {
-    opacity: 0.6,
+  rating: {
     marginLeft: 4,
   },
   title: {
@@ -247,19 +258,47 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     opacity: 0.7,
   },
-  cardFooter: {
+  footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  messageButton: {
-    margin: 0,
+  stats: {
+    flexDirection: 'row',
   },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    borderRadius: 16,
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  statText: {
+    marginLeft: 4,
+  },
+  actionBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  actionLeft: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  actionRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+  },
+  actionText: {
+    marginLeft: 8,
+    fontWeight: '500',
   },
 });
 

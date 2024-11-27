@@ -1,179 +1,179 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image } from 'react-native';
-import { TextInput, Button, Text, SegmentedButtons, useTheme, Surface, IconButton } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { Text, TextInput, Button, useTheme, SegmentedButtons, IconButton, Surface } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Animated, { FadeInDown, FadeIn, SlideInRight } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
-import { Formik } from 'formik';
-import * as Yup from 'yup';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-
-const validationSchema = Yup.object().shape({
-  title: Yup.string()
-    .min(3, 'Le titre doit contenir au moins 3 caractères')
-    .max(50, 'Le titre ne doit pas dépasser 50 caractères')
-    .required('Le titre est requis'),
-  description: Yup.string()
-    .min(10, 'La description doit contenir au moins 10 caractères')
-    .max(500, 'La description ne doit pas dépasser 500 caractères')
-    .required('La description est requise'),
-  category: Yup.string().required('La catégorie est requise'),
-});
 
 const PostScreen = () => {
   const theme = useTheme();
-  const [images, setImages] = useState<string[]>([]);
+  const [postType, setPostType] = useState('service');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [images, setImages] = useState([]);
 
-  const pickImage = async () => {
+  const handleImagePick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
       allowsMultipleSelection: true,
-      selectionLimit: 5,
+      quality: 1,
     });
 
     if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
+      setImages([...images, ...result.assets]);
     }
   };
 
-  const removeImage = (index: number) => {
+  const removeImage = (index) => {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (values: any) => {
-    console.log('Annonce à publier:', { ...values, images });
-    // TODO: Implémenter l'envoi à Firebase
+  const renderImagePreview = () => {
+    if (images.length === 0) {
+      return (
+        <Button
+          mode="outlined"
+          icon="camera-plus"
+          onPress={handleImagePick}
+          style={styles.addImageButton}
+          contentStyle={styles.addImageButtonContent}
+        >
+          Ajouter des photos
+        </Button>
+      );
+    }
+
+    return (
+      <View style={styles.imagePreviewContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {images.map((image, index) => (
+            <Animated.View 
+              key={index}
+              entering={FadeInDown.delay(index * 100)}
+              style={styles.imagePreview}
+            >
+              <IconButton
+                icon="close-circle"
+                size={20}
+                style={styles.removeImageButton}
+                onPress={() => removeImage(index)}
+              />
+              <Animated.Image
+                source={{ uri: image.uri }}
+                style={styles.previewImage}
+              />
+            </Animated.View>
+          ))}
+          <Button
+            mode="outlined"
+            icon="plus"
+            onPress={handleImagePick}
+            style={[styles.addMoreButton, { borderColor: theme.colors.primary }]}
+            labelStyle={{ color: theme.colors.primary }}
+          >
+            Plus
+          </Button>
+        </ScrollView>
+      </View>
+    );
   };
 
   return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <Animated.View 
-        entering={FadeInDown.duration(1000).springify()}
-        style={styles.header}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoid}
       >
-        <Text variant="headlineMedium" style={[styles.title, { color: theme.colors.primary }]}>
-          Nouvelle annonce
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Partagez vos services ou votre matériel avec vos voisins
-        </Text>
-      </Animated.View>
-
-      <Formik
-        initialValues={{ title: '', description: '', category: 'services' }}
-        validationSchema={validationSchema}
-        onSubmit={handleSubmit}
-      >
-        {({ handleChange, handleBlur, handleSubmit, values, errors, touched, setFieldValue }) => (
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <Animated.View 
-            entering={FadeInUp.duration(1000).springify()}
-            style={styles.formContainer}
+            entering={FadeIn.duration(500)}
+            style={styles.content}
           >
-            <Surface style={styles.form} elevation={1}>
-              <TextInput
-                label="Titre de l'annonce"
-                value={values.title}
-                onChangeText={handleChange('title')}
-                onBlur={handleBlur('title')}
-                style={styles.input}
-                error={touched.title && errors.title}
-                mode="outlined"
-                left={<TextInput.Icon icon="format-title" />}
-              />
-              {touched.title && errors.title && (
-                <Text style={[styles.error, { color: theme.colors.error }]}>
-                  {errors.title}
-                </Text>
-              )}
+            <Text 
+              variant="headlineMedium" 
+              style={[styles.header, { color: theme.colors.primary }]}
+            >
+              Nouvelle annonce
+            </Text>
 
-              <TextInput
-                label="Description"
-                value={values.description}
-                onChangeText={handleChange('description')}
-                onBlur={handleBlur('description')}
-                multiline
-                numberOfLines={4}
-                style={[styles.input, styles.textArea]}
-                error={touched.description && errors.description}
-                mode="outlined"
-                left={<TextInput.Icon icon="text" />}
-              />
-              {touched.description && errors.description && (
-                <Text style={[styles.error, { color: theme.colors.error }]}>
-                  {errors.description}
-                </Text>
-              )}
-
-              <Text variant="titleMedium" style={styles.sectionTitle}>Catégorie</Text>
-              <SegmentedButtons
-                value={values.category}
-                onValueChange={(value) => setFieldValue('category', value)}
-                buttons={[
-                  {
-                    value: 'services',
-                    label: 'Services',
-                    icon: 'account-wrench',
-                    checkedColor: theme.colors.primary,
-                  },
-                  {
-                    value: 'materiel',
-                    label: 'Matériel',
-                    icon: 'tools',
-                    checkedColor: theme.colors.primary,
-                  },
-                  {
-                    value: 'autre',
-                    label: 'Autre',
-                    icon: 'dots-horizontal',
-                    checkedColor: theme.colors.primary,
-                  },
-                ]}
-                style={styles.categoryButtons}
-              />
-
-              <Text variant="titleMedium" style={styles.sectionTitle}>Photos</Text>
-              <View style={styles.imagesContainer}>
-                {images.map((uri, index) => (
-                  <View key={index} style={styles.imageWrapper}>
-                    <Image source={{ uri }} style={styles.image} />
-                    <IconButton
-                      icon="close-circle"
-                      size={24}
-                      iconColor={theme.colors.error}
-                      style={styles.removeImageButton}
-                      onPress={() => removeImage(index)}
-                    />
-                  </View>
-                ))}
-                {images.length < 5 && (
-                  <Button
-                    mode="outlined"
-                    onPress={pickImage}
-                    style={styles.addImageButton}
-                    icon="camera"
-                  >
-                    {images.length === 0 ? 'Ajouter des photos' : 'Ajouter'}
-                  </Button>
-                )}
-              </View>
-
-              <Button
-                mode="contained"
-                onPress={handleSubmit}
-                style={styles.submitButton}
-                icon="send"
+            <Surface style={styles.card}>
+              <Animated.View 
+                entering={SlideInRight.duration(500)}
+                style={styles.typeSelector}
               >
-                Publier l'annonce
-              </Button>
+                <SegmentedButtons
+                  value={postType}
+                  onValueChange={(value) => setPostType(value)}
+                  buttons={[
+                    {
+                      value: 'service',
+                      label: 'Service',
+                      icon: 'account-wrench',
+                      style: postType === 'service' ? { backgroundColor: theme.colors.primaryContainer, borderRadius: 8 } : undefined
+                    },
+                    {
+                      value: 'material',
+                      label: 'Matériel',
+                      icon: 'package-variant',
+                      style: postType === 'material' ? { backgroundColor: theme.colors.primaryContainer, borderRadius: 8 } : undefined
+                    },
+                  ]}
+                />
+              </Animated.View>
+
+              <Animated.View 
+                entering={FadeInDown.duration(500).delay(200)}
+                style={styles.formContainer}
+              >
+                <TextInput
+                  mode="outlined"
+                  label="Titre de l'annonce"
+                  value={title}
+                  onChangeText={setTitle}
+                  style={styles.input}
+                  placeholder={postType === 'service' ? "Ex: Réparation plomberie" : "Ex: Prêt perceuse"}
+                  outlineStyle={styles.inputOutline}
+                />
+
+                <TextInput
+                  mode="outlined"
+                  label="Description"
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  numberOfLines={4}
+                  style={[styles.input, styles.descriptionInput]}
+                  placeholder={postType === 'service' ? 
+                    "Décrivez le service que vous proposez..." : 
+                    "Décrivez le matériel que vous souhaitez prêter..."}
+                  outlineStyle={styles.inputOutline}
+                />
+
+                {renderImagePreview()}
+              </Animated.View>
             </Surface>
           </Animated.View>
-        )}
-      </Formik>
-    </ScrollView>
+        </ScrollView>
+
+        <Animated.View 
+          entering={FadeInDown.duration(500).delay(400)}
+          style={styles.footer}
+        >
+          <Button 
+            mode="contained"
+            onPress={() => {}}
+            style={styles.submitButton}
+            contentStyle={styles.submitButtonContent}
+          >
+            Publier l'annonce
+          </Button>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -181,73 +181,90 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    padding: 24,
-    alignItems: 'center',
+  keyboardAvoid: {
+    flex: 1,
   },
-  title: {
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
+  scrollContent: {
+    flexGrow: 1,
   },
-  subtitle: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  formContainer: {
+  content: {
+    flex: 1,
     padding: 16,
   },
-  form: {
-    padding: 24,
+  header: {
+    marginBottom: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  card: {
+    padding: 16,
     borderRadius: 16,
+    elevation: 4,
   },
-  input: {
-    marginBottom: 4,
-  },
-  textArea: {
-    minHeight: 100,
-  },
-  error: {
-    fontSize: 12,
-    marginBottom: 16,
-    marginTop: -2,
-  },
-  sectionTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  categoryButtons: {
-    marginBottom: 16,
-  },
-  imagesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  typeSelector: {
     marginBottom: 24,
   },
-  imageWrapper: {
-    position: 'relative',
+  formContainer: {
+    gap: 16,
   },
-  image: {
+  input: {
+    backgroundColor: 'transparent',
+  },
+  inputOutline: {
+    borderRadius: 8,
+  },
+  descriptionInput: {
+    minHeight: 120,
+  },
+  imagePreviewContainer: {
+    marginTop: 16,
+  },
+  imagePreview: {
+    position: 'relative',
+    marginRight: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  previewImage: {
     width: 100,
     height: 100,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   removeImageButton: {
     position: 'absolute',
     top: -8,
     right: -8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
     margin: 0,
-    padding: 0,
+    zIndex: 1,
   },
   addImageButton: {
-    height: 100,
-    justifyContent: 'center',
     borderStyle: 'dashed',
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+    height: 100,
+  },
+  addImageButtonContent: {
+    height: '100%',
+  },
+  addMoreButton: {
+    height: 100,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    borderWidth: 2,
+    justifyContent: 'center',
+  },
+  footer: {
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 0 : 16,
   },
   submitButton: {
-    marginTop: 8,
+    borderRadius: 12,
+    marginBottom: Platform.OS === 'ios' ? 16 : 0,
+  },
+  submitButtonContent: {
+    paddingVertical: 8,
   },
 });
 
