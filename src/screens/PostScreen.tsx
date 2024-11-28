@@ -7,10 +7,14 @@ import Animated, { FadeInDown, FadeIn, SlideInRight } from 'react-native-reanima
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { postService } from '../services/postService';
+import { useAuthContext } from '../contexts/AuthContext';
+import { useRequireAuth } from '../hooks/useRequireAuth';
 
 const PostScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation();
+  const { user, userProfile } = useAuthContext();
+  const requireAuth = useRequireAuth();
   const [postType, setPostType] = useState('service');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -86,6 +90,8 @@ const PostScreen = () => {
   };
 
   const handleSubmit = async () => {
+    if (!requireAuth(() => {})) return;
+
     if (!title.trim() || !description.trim()) {
       setError('Veuillez remplir tous les champs obligatoires');
       return;
@@ -99,12 +105,13 @@ const PostScreen = () => {
         category: postType,
         description: description.trim(),
         requestor: {
-          id: 'user123', // À remplacer par l'ID de l'utilisateur connecté
-          name: 'Utilisateur', // À remplacer par le nom de l'utilisateur connecté
+          id: user.uid,
+          name: userProfile?.displayName || 'Utilisateur',
+          avatar: userProfile?.avatar,
         },
         location: {
-          address: '',
-          coordinates: {
+          address: userProfile?.address || '',
+          coordinates: userProfile?.coordinates || {
             latitude: 0,
             longitude: 0,
           }

@@ -1,178 +1,164 @@
-import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  FlatList,
-} from 'react-native';
-import {
-  Text,
-  Avatar,
-  useTheme,
-  MD3Theme,
-  TextInput,
-  IconButton,
-  Surface,
-} from 'react-native-paper';
-import Animated, {
-  FadeInUp,
-  Layout,
-} from 'react-native-reanimated';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { Text, TextInput, IconButton, Surface, useTheme, ActivityIndicator } from 'react-native-paper';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import { chatService } from '../services/chatService';
+import { Message } from '../types/chat';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import Animated, { FadeInUp } from 'react-native-reanimated';
+import { useAuthContext } from '../contexts/AuthContext';
 
-// Types
-type Message = {
-  id: string;
-  text: string;
-  timestamp: number;
-  senderId: string;
-  senderName: string;
-  senderAvatar: string;
+const MessageBubble = ({ message, isOwnMessage }) => {
+  const theme = useTheme();
+
+  return (
+    <Animated.View
+      entering={FadeInUp}
+      style={[
+        styles.messageBubble,
+        isOwnMessage ? styles.ownMessage : styles.otherMessage,
+        {
+          backgroundColor: isOwnMessage
+            ? theme.colors.primaryContainer
+            : theme.colors.surfaceVariant,
+        },
+      ]}
+    >
+      <Text style={[
+        styles.messageText,
+        { color: isOwnMessage ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant }
+      ]}>
+        {message.text}
+      </Text>
+      <Text style={[styles.messageTime, { color: isOwnMessage ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant }]}>
+        {format(message.createdAt, 'HH:mm', { locale: fr })}
+      </Text>
+    </Animated.View>
+  );
 };
 
-// Mock data
-const mockMessages: Message[] = [
-  {
-    id: '1',
-    text: "Bonjour ! Je suis intéressé par votre annonce. Est-ce toujours d'actualité ?",
-    timestamp: Date.now() - 3600000,
-    senderId: '2',
-    senderName: 'Thomas Martin',
-    senderAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36',
-  },
-  {
-    id: '2',
-    text: 'Oui, tout à fait ! Quand seriez-vous disponible ?',
-    timestamp: Date.now() - 3500000,
-    senderId: '1',
-    senderName: 'Marie Laurent',
-    senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
-  },
-  {
-    id: '3',
-    text: 'Je suis libre ce weekend, samedi matin si cela vous convient.',
-    timestamp: Date.now() - 3400000,
-    senderId: '2',
-    senderName: 'Thomas Martin',
-    senderAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36',
-  },
-];
-
 const ChatScreen = () => {
-  const theme = useTheme<MD3Theme>();
-  const [message, setMessage] = useState('');
-  const currentUserId = '1'; // À remplacer par l'ID de l'utilisateur connecté
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  
+  const route = useRoute();
+  const navigation = useNavigation();
+  const theme = useTheme();
+  const flatListRef = useRef(null);
+  const { user } = useAuthContext();
+  
+  const { conversationId } = route.params;
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isOwnMessage = item.senderId === currentUserId;
+  useEffect(() => {
+    if (!user) return;
+    loadMessages();
+    const unsubscribe = chatService.subscribeToMessages(conversationId, (newMessages) => {
+      setMessages(newMessages);
+      chatService.markMessagesAsRead(conversationId, user.uid);
+    });
 
-    return (
-      <Animated.View
-        entering={FadeInUp}
-        layout={Layout.springify()}
-        style={[
-          styles.messageContainer,
-          isOwnMessage ? styles.ownMessageContainer : null,
-        ]}
-      >
-        {!isOwnMessage && (
-          <Avatar.Image
-            size={32}
-            source={{ uri: item.senderAvatar }}
-            style={styles.avatar}
-          />
-        )}
-        <View
-          style={[
-            styles.messageBubble,
-            {
-              backgroundColor: isOwnMessage
-                ? theme.colors.primary
-                : theme.colors.surfaceVariant,
-              borderBottomLeftRadius: isOwnMessage ? 16 : 4,
-              borderBottomRightRadius: isOwnMessage ? 4 : 16,
-            },
-          ]}
-        >
-          {!isOwnMessage && (
-            <Text
-              variant="labelSmall"
-              style={[
-                styles.senderName,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
-              {item.senderName}
-            </Text>
-          )}
-          <Text
-            style={{
-              color: isOwnMessage
-                ? theme.colors.onPrimary
-                : theme.colors.onSurfaceVariant,
-            }}
-          >
-            {item.text}
-          </Text>
-          <Text
-            variant="labelSmall"
-            style={[
-              styles.timestamp,
-              {
-                color: isOwnMessage
-                  ? theme.colors.onPrimary
-                  : theme.colors.onSurfaceVariant,
-                opacity: 0.7,
-              },
-            ]}
-          >
-            {new Date(item.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
-        </View>
-      </Animated.View>
-    );
-  };
+    return () => unsubscribe();
+  }, [conversationId, user]);
 
-  const sendMessage = () => {
-    if (message.trim()) {
-      // Ici, vous ajouteriez la logique pour envoyer le message
-      console.log('Message envoyé:', message);
-      setMessage('');
+  const loadMessages = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const conversationMessages = await chatService.getConversationMessages(conversationId);
+      setMessages(conversationMessages);
+      chatService.markMessagesAsRead(conversationId, user.uid);
+    } catch (err) {
+      console.error('Erreur lors du chargement des messages:', err);
+      setError('Impossible de charger les messages. Veuillez réessayer.');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !user) return;
+
+    try {
+      setSending(true);
+      await chatService.sendMessage({
+        conversationId,
+        senderId: user.uid,
+        text: newMessage.trim(),
+        read: false
+      });
+      setNewMessage('');
+      flatListRef.current?.scrollToEnd();
+    } catch (err) {
+      console.error('Erreur lors de l\'envoi du message:', err);
+      setError('Impossible d\'envoyer le message. Veuillez réessayer.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text variant="bodyLarge" style={{ color: theme.colors.error }}>
+          {error}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <FlatList
-        data={mockMessages}
-        renderItem={renderMessage}
+        ref={flatListRef}
+        data={messages}
         keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <MessageBubble
+            message={item}
+            isOwnMessage={item.senderId === user.uid}
+          />
+        )}
         contentContainerStyle={styles.messagesList}
-        inverted={false}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Text variant="bodyLarge">Aucun message</Text>
+          </View>
+        )}
       />
-      <Surface style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]} elevation={2}>
+
+      <Surface style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}>
         <TextInput
           mode="outlined"
-          value={message}
-          onChangeText={setMessage}
+          value={newMessage}
+          onChangeText={setNewMessage}
           placeholder="Votre message..."
           style={styles.input}
           multiline
           maxLength={500}
-          dense
+          disabled={sending}
         />
         <IconButton
           icon="send"
           mode="contained"
           onPress={sendMessage}
-          disabled={!message.trim()}
+          disabled={!newMessage.trim() || sending}
           style={styles.sendButton}
         />
       </Surface>
@@ -184,59 +170,55 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   messagesList: {
     padding: 16,
   },
-  messageContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    alignItems: 'flex-end',
-  },
-  ownMessageContainer: {
-    flexDirection: 'row-reverse',
-  },
-  avatar: {
-    marginRight: 8,
-    marginLeft: 0,
-  },
   messageBubble: {
-    maxWidth: '75%',
+    maxWidth: '80%',
     padding: 12,
     borderRadius: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    marginBottom: 8,
   },
-  senderName: {
-    marginBottom: 4,
-  },
-  timestamp: {
+  ownMessage: {
     alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+  },
+  otherMessage: {
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
+  },
+  messageText: {
+    fontSize: 16,
+  },
+  messageTime: {
+    fontSize: 12,
     marginTop: 4,
-    fontSize: 10,
+    opacity: 0.7,
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     padding: 8,
+    alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   input: {
     flex: 1,
-    marginRight: 8,
     maxHeight: 100,
   },
   sendButton: {
-    margin: 0,
+    marginLeft: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 32,
   },
 });
 

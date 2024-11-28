@@ -1,110 +1,130 @@
 import React from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
-import { Text, Avatar, Surface, useTheme, Divider } from 'react-native-paper';
+import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { Text, Surface, useTheme, IconButton, ActivityIndicator, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useNotificationContext } from '../contexts/NotificationContext';
+import { Notification } from '../types/notification';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
+const NotificationItem: React.FC<{
+  notification: Notification;
+  onPress: () => void;
+}> = ({ notification, onPress }) => {
+  const theme = useTheme();
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'message':
+        return 'message';
+      case 'request':
+        return 'account-clock';
+      case 'service':
+        return 'handshake';
+      default:
+        return 'bell';
+    }
+  };
+
+  return (
+    <Surface
+      style={[
+        styles.notificationItem,
+        { backgroundColor: notification.read ? theme.colors.surface : theme.colors.surfaceVariant }
+      ]}
+    >
+      <View style={styles.notificationContent}>
+        <IconButton
+          icon={getIcon(notification.type)}
+          size={24}
+          iconColor={theme.colors.primary}
+        />
+        <View style={styles.textContainer}>
+          <Text variant="titleMedium">{notification.title}</Text>
+          <Text variant="bodyMedium">{notification.message}</Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+            {format(notification.createdAt, 'PPp', { locale: fr })}
+          </Text>
+        </View>
+      </View>
+    </Surface>
+  );
+};
 
 const NotificationsScreen = () => {
   const theme = useTheme();
-  const [refreshing, setRefreshing] = React.useState(false);
+  const {
+    notifications,
+    loading,
+    error,
+    refreshNotifications,
+    markAsRead,
+    markAllAsRead,
+    unreadCount
+  } = useNotificationContext();
 
-  const notifications = [
-    {
-      id: '1',
-      type: 'like',
-      user: {
-        name: 'Marie D.',
-        avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-      },
-      content: 'a aimé votre annonce',
-      postTitle: 'Prêt de perceuse professionnelle',
-      timestamp: new Date().getTime() - 3600000, // 1 hour ago
-      read: false,
-    },
-    {
-      id: '2',
-      type: 'response',
-      user: {
-        name: 'Pierre M.',
-        avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-      },
-      content: 'a répondu à votre annonce',
-      postTitle: 'Cours de guitare personnalisés',
-      timestamp: new Date().getTime() - 7200000, // 2 hours ago
-      read: true,
-    },
-  ];
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
-
-  const getTimeAgo = (timestamp: number) => {
-    const seconds = Math.floor((new Date().getTime() - timestamp) / 1000);
-    if (seconds < 60) return 'À l\'instant';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `Il y a ${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `Il y a ${hours}h`;
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'Hier';
-    return `Il y a ${days} jours`;
+  const handleNotificationPress = async (notification: Notification) => {
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    // Gérer la navigation en fonction du type de notification
+    // TODO: Implémenter la navigation
   };
 
-  const renderNotification = ({ item, index }: any) => (
-    <Animated.View
-      entering={FadeInDown.delay(index * 100).springify()}
-    >
-      <Surface
-        style={[
-          styles.notificationCard,
-          { backgroundColor: item.read ? theme.colors.surface : theme.colors.surfaceVariant }
-        ]}
-      >
-        <View style={styles.notificationContent}>
-          <Avatar.Image 
-            size={50}
-            source={{ uri: item.user.avatar }}
-          />
-          <View style={styles.textContainer}>
-            <Text style={styles.notificationText}>
-              <Text style={styles.userName}>{item.user.name}</Text>
-              {' '}{item.content}{' '}
-              <Text style={styles.postTitle}>"{item.postTitle}"</Text>
-            </Text>
-            <Text style={[styles.timestamp, { color: theme.colors.onSurfaceVariant }]}>
-              {getTimeAgo(item.timestamp)}
-            </Text>
-          </View>
-          <MaterialCommunityIcons
-            name={item.type === 'like' ? 'heart' : 'message-reply-text'}
-            size={24}
-            color={item.type === 'like' ? theme.colors.error : theme.colors.primary}
-            style={styles.icon}
-          />
-        </View>
-      </Surface>
-      <Divider />
-    </Animated.View>
-  );
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
+          {error}
+        </Text>
+        <Button mode="contained" onPress={refreshNotifications}>
+          Réessayer
+        </Button>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {unreadCount > 0 && (
+        <Button
+          mode="contained-tonal"
+          onPress={markAllAsRead}
+          style={styles.markAllButton}
+        >
+          Tout marquer comme lu
+        </Button>
+      )}
+      
       <FlatList
         data={notifications}
-        renderItem={renderNotification}
-        keyExtractor={item => item.id}
-        showsVerticalScrollIndicator={false}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <NotificationItem
+            notification={item}
+            onPress={() => handleNotificationPress(item)}
+          />
+        )}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
+            refreshing={loading}
+            onRefresh={refreshNotifications}
             colors={[theme.colors.primary]}
           />
+        }
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text variant="bodyLarge">Aucune notification</Text>
+          </View>
         }
       />
     </SafeAreaView>
@@ -115,34 +135,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  notificationCard: {
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
+  },
+  listContent: {
+    padding: 16,
+  },
+  notificationItem: {
+    marginBottom: 8,
+    borderRadius: 8,
+    elevation: 1,
   },
   notificationContent: {
     flexDirection: 'row',
+    padding: 8,
     alignItems: 'center',
   },
   textContainer: {
     flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
+    marginLeft: 8,
   },
-  notificationText: {
-    fontSize: 14,
-    lineHeight: 20,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 32,
   },
-  userName: {
-    fontWeight: '600',
-  },
-  postTitle: {
-    fontStyle: 'italic',
-  },
-  timestamp: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  icon: {
-    marginLeft: 'auto',
+  markAllButton: {
+    margin: 16,
+    marginBottom: 0,
   },
 });
 

@@ -1,39 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
-import { Text, Avatar, Button, Surface, useTheme, TextInput, Chip, IconButton, List, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { Text, Avatar, Button, Surface, useTheme, TextInput, Chip, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { auth } from '../config/firebase';
+import { signOut } from 'firebase/auth';
+import { useUserContext } from '../contexts/UserContext';
+
+type RootStackParamList = {
+  Auth: undefined;
+  Main: undefined;
+};
+
+type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const ProfileScreen = () => {
   const theme = useTheme();
-  const navigation = useNavigation();
-  const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: 'Marie Dupont',
-    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-    city: 'Bordeaux',
-    rating: 4.8,
-    reviewCount: 15,
-    bio: 'Passionnée de bricolage et jardinage. J\'aime partager mes connaissances et aider mes voisins.',
-    skills: [
-      'Bricolage',
-      'Jardinage',
-      'Peinture',
-      'Plomberie',
-      'Électricité basique',
-    ],
-    workPhotos: [
-      'https://images.unsplash.com/photo-1503594384566-461fe158e797',
-      'https://images.unsplash.com/photo-1574511098078-b28037dae334',
-      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a',
-    ],
-  });
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const { 
+    userProfile,
+    loading,
+    error,
+    updateProfile,
+    updateAvatar,
+    addSkill,
+    removeSkill,
+    addPortfolioItem,
+    removePortfolioItem,
+    refreshProfile
+  } = useUserContext();
 
+  const [isEditing, setIsEditing] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   const [showSkillInput, setShowSkillInput] = useState(false);
+
+  // Log du contexte utilisateur
+  useEffect(() => {
+    console.log('UserContext State:', {
+      userProfile,
+      loading,
+      error,
+      isEditing
+    });
+  }, [userProfile, loading, error, isEditing]);
+
+  // Rafraîchir le profil au montage du composant
+  useEffect(() => {
+    refreshProfile();
+  }, []);
 
   useEffect(() => {
     navigation.setOptions({
@@ -41,25 +59,50 @@ const ProfileScreen = () => {
         <IconButton
           icon={isEditing ? "check" : "pencil"}
           mode="contained"
-          onPress={() => setIsEditing(!isEditing)}
+          onPress={handleEditToggle}
           style={{ marginRight: 8 }}
         />
       ),
     });
   }, [isEditing, navigation]);
 
-  const handleLogout = () => {
+  const handleEditToggle = async () => {
+    if (isEditing && userProfile) {
+      try {
+        await updateProfile({
+          firstName: userProfile.firstName,
+          lastName: userProfile.lastName,
+          bio: userProfile.bio,
+          location: userProfile.location,
+        });
+        Alert.alert('Succès', 'Profil mis à jour avec succès');
+      } catch (err) {
+        Alert.alert('Erreur', 'Impossible de mettre à jour le profil. Veuillez réessayer.');
+      }
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleLogout = async () => {
     Alert.alert(
       'Déconnexion',
       'Êtes-vous sûr de vouloir vous déconnecter ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { 
+        {
           text: 'Déconnexion',
           style: 'destructive',
-          onPress: () => {
-            // Ajouter la logique de déconnexion ici
-            console.log('Déconnexion');
+          onPress: async () => {
+            try {
+              await signOut(auth);
+              navigation.replace('Auth');
+            } catch (error) {
+              Alert.alert(
+                'Erreur',
+                'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
+                [{ text: 'OK' }]
+              );
+            }
           }
         },
       ]
@@ -75,40 +118,72 @@ const ProfileScreen = () => {
     });
 
     if (!result.canceled) {
-      if (isAvatar) {
-        setProfileData({ ...profileData, avatar: result.assets[0].uri });
-      } else {
-        setProfileData({
-          ...profileData,
-          workPhotos: [...profileData.workPhotos, result.assets[0].uri],
-        });
+      try {
+        const imageUri = result.assets[0].uri;
+        if (isAvatar) {
+          await updateAvatar(imageUri);
+        } else {
+          await addPortfolioItem(imageUri, '');
+        }
+      } catch (err) {
+        Alert.alert('Erreur', 'Impossible de mettre à jour l\'image. Veuillez réessayer.');
       }
     }
   };
 
-  const removePhoto = (index: number) => {
-    const newPhotos = [...profileData.workPhotos];
-    newPhotos.splice(index, 1);
-    setProfileData({ ...profileData, workPhotos: newPhotos });
-  };
+  const handleAddSkill = async () => {
+    if (!newSkill.trim()) return;
 
-  const addSkill = () => {
-    if (newSkill.trim() && !profileData.skills.includes(newSkill.trim())) {
-      setProfileData({
-        ...profileData,
-        skills: [...profileData.skills, newSkill.trim()],
-      });
+    try {
+      await addSkill(newSkill.trim(), 1);
       setNewSkill('');
       setShowSkillInput(false);
+    } catch (err) {
+      Alert.alert('Erreur', 'Impossible d\'ajouter la compétence. Veuillez réessayer.');
     }
   };
 
-  const removeSkill = (skill: string) => {
-    setProfileData({
-      ...profileData,
-      skills: profileData.skills.filter((s) => s !== skill),
-    });
+  const handleRemoveSkill = async (skillName: string) => {
+    try {
+      await removeSkill(skillName);
+    } catch (err) {
+      Alert.alert('Erreur', 'Impossible de supprimer la compétence. Veuillez réessayer.');
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
+          {error}
+        </Text>
+        <Button mode="contained" onPress={refreshProfile}>
+          Réessayer
+        </Button>
+      </View>
+    );
+  }
+
+  if (!userProfile) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
+          Profil non trouvé
+        </Text>
+        <Button mode="contained" onPress={() => navigation.replace('Auth')}>
+          Se connecter
+        </Button>
+      </View>
+    );
+  }
 
   const renderSection = (title: string, children: React.ReactNode) => (
     <Animated.View
@@ -121,13 +196,13 @@ const ProfileScreen = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#F5F5F5' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <Surface style={[styles.profileHeader, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.avatarContainer}>
             <Avatar.Image
               size={100}
-              source={{ uri: profileData.avatar }}
+              source={{ uri: userProfile.avatar || 'https://via.placeholder.com/150' }}
             />
             {isEditing && (
               <IconButton
@@ -143,13 +218,16 @@ const ProfileScreen = () => {
           {isEditing ? (
             <TextInput
               mode="outlined"
-              value={profileData.name}
-              onChangeText={(text) => setProfileData({ ...profileData, name: text })}
+              value={`${userProfile.firstName} ${userProfile.lastName}`}
+              onChangeText={(text) => {
+                const [firstName = '', lastName = ''] = text.split(' ');
+                updateProfile({ firstName, lastName });
+              }}
               style={styles.nameInput}
             />
           ) : (
             <Text variant="headlineSmall" style={styles.name}>
-              {profileData.name}
+              {`${userProfile.firstName} ${userProfile.lastName}`}
             </Text>
           )}
 
@@ -163,12 +241,16 @@ const ProfileScreen = () => {
               {isEditing ? (
                 <TextInput
                   mode="flat"
-                  value={profileData.city}
-                  onChangeText={(text) => setProfileData({ ...profileData, city: text })}
+                  value={userProfile.location.address}
+                  onChangeText={(text) => 
+                    updateProfile({ 
+                      location: { ...userProfile.location, address: text } 
+                    })
+                  }
                   style={styles.cityInput}
                 />
               ) : (
-                <Text style={styles.city}>{profileData.city}</Text>
+                <Text style={styles.city}>{userProfile.location.address}</Text>
               )}
             </View>
             <View style={styles.ratingContainer}>
@@ -176,54 +258,54 @@ const ProfileScreen = () => {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <MaterialCommunityIcons
                     key={star}
-                    name={star <= Math.floor(profileData.rating) ? 'star' : 'star-outline'}
+                    name={star <= Math.floor(userProfile.rating.average) ? 'star' : 'star-outline'}
                     size={16}
                     color={theme.colors.primary}
                   />
                 ))}
               </View>
               <Text style={styles.ratingText}>
-                {profileData.rating} ({profileData.reviewCount} avis)
+                {userProfile.rating.average.toFixed(1)} ({userProfile.rating.count} avis)
               </Text>
             </View>
           </View>
         </Surface>
 
-        {renderSection('Présentation', 
+        {renderSection('À propos',
           isEditing ? (
             <TextInput
               mode="outlined"
-              value={profileData.bio}
-              onChangeText={(text) => setProfileData({ ...profileData, bio: text })}
+              value={userProfile.bio}
+              onChangeText={(text) => 
+                updateProfile({ bio: text })
+              }
               multiline
               numberOfLines={4}
               style={styles.bioInput}
             />
           ) : (
-            <Text variant="bodyLarge" style={styles.bio}>
-              {profileData.bio}
-            </Text>
+            <Text style={styles.bio}>{userProfile.bio}</Text>
           )
         )}
 
         {renderSection('Compétences',
           <View>
             <View style={styles.skillsContainer}>
-              {profileData.skills.map((skill, index) => (
+              {userProfile.skills.map((skill, index) => (
                 <Chip
                   key={index}
-                  onClose={isEditing ? () => removeSkill(skill) : undefined}
+                  onClose={isEditing ? () => handleRemoveSkill(skill.name) : undefined}
                   style={styles.skillChip}
                   textStyle={{ color: theme.colors.onSurface }}
                 >
-                  {skill}
+                  {skill.name}
                 </Chip>
               ))}
               {isEditing && !showSkillInput && (
                 <Button
                   mode="outlined"
-                  onPress={() => setShowSkillInput(true)}
                   icon="plus"
+                  onPress={() => setShowSkillInput(true)}
                 >
                   Ajouter
                 </Button>
@@ -236,14 +318,9 @@ const ProfileScreen = () => {
                   value={newSkill}
                   onChangeText={setNewSkill}
                   placeholder="Nouvelle compétence"
-                  right={
-                    <TextInput.Icon
-                      icon="check"
-                      onPress={addSkill}
-                    />
-                  }
                   style={styles.skillInput}
                 />
+                <Button onPress={handleAddSkill}>Ajouter</Button>
               </View>
             )}
           </View>
@@ -252,15 +329,15 @@ const ProfileScreen = () => {
         {renderSection('Photos de mes réalisations',
           <View>
             <View style={styles.photosGrid}>
-              {profileData.workPhotos.map((photo, index) => (
+              {userProfile.portfolio.map((item, index) => (
                 <View key={index} style={styles.photoContainer}>
-                  <Image source={{ uri: photo }} style={styles.photo} />
+                  <Image source={{ uri: item.imageUrl }} style={styles.photo} />
                   {isEditing && (
                     <IconButton
                       icon="close"
                       mode="contained"
                       size={20}
-                      onPress={() => removePhoto(index)}
+                      onPress={() => removePortfolioItem(item.id)}
                       style={styles.removePhotoButton}
                     />
                   )}
@@ -268,11 +345,11 @@ const ProfileScreen = () => {
               ))}
               {isEditing && (
                 <TouchableOpacity
-                  style={[styles.addPhotoButton, { borderColor: theme.colors.outline }]}
+                  style={[styles.addPhotoButton, { borderColor: theme.colors.primary }]}
                   onPress={() => pickImage(false)}
                 >
                   <MaterialCommunityIcons
-                    name="camera-plus"
+                    name="plus"
                     size={32}
                     color={theme.colors.primary}
                   />
@@ -282,34 +359,14 @@ const ProfileScreen = () => {
           </View>
         )}
 
-        {renderSection('Paramètres',
-          <View>
-            <List.Item
-              title="Modifier le mot de passe"
-              left={props => <List.Icon {...props} icon="key" />}
-              onPress={() => {}}
-            />
-            <Divider />
-            <List.Item
-              title="Notifications"
-              left={props => <List.Icon {...props} icon="bell" />}
-              onPress={() => {}}
-            />
-            <Divider />
-            <List.Item
-              title="Confidentialité"
-              left={props => <List.Icon {...props} icon="shield-account" />}
-              onPress={() => {}}
-            />
-            <Divider />
-            <List.Item
-              title="Déconnexion"
-              left={props => <List.Icon {...props} icon="logout" color={theme.colors.error} />}
-              titleStyle={{ color: theme.colors.error }}
-              onPress={handleLogout}
-            />
-          </View>
-        )}
+        <Button
+          mode="contained"
+          onPress={handleLogout}
+          style={styles.logoutButton}
+          buttonColor={theme.colors.error}
+        >
+          Déconnexion
+        </Button>
       </ScrollView>
     </SafeAreaView>
   );
@@ -319,14 +376,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
   scrollView: {
     flex: 1,
   },
   profileHeader: {
     padding: 16,
-    margin: 16,
-    borderRadius: 12,
     alignItems: 'center',
+    borderRadius: 0,
   },
   avatarContainer: {
     marginBottom: 16,
@@ -334,29 +395,58 @@ const styles = StyleSheet.create({
   },
   editAvatarButton: {
     position: 'absolute',
-    bottom: -8,
     right: -8,
+    bottom: -8,
   },
   name: {
-    fontWeight: '600',
-  },
-  nameInput: {
-    width: '80%',
+    marginBottom: 8,
     textAlign: 'center',
   },
-  section: {
-    padding: 16,
+  nameInput: {
     marginBottom: 8,
+    width: '100%',
+  },
+  locationRatingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 8,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  city: {
+    marginLeft: 4,
+  },
+  cityInput: {
+    flex: 1,
+    marginLeft: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginRight: 4,
+  },
+  ratingText: {
+    fontSize: 12,
+  },
+  section: {
+    margin: 8,
+    padding: 16,
+    borderRadius: 8,
   },
   sectionTitle: {
-    marginBottom: 12,
-    fontWeight: '600',
+    marginBottom: 8,
   },
   bio: {
-    lineHeight: 24,
+    lineHeight: 20,
   },
   bioInput: {
-    marginTop: 8,
+    width: '100%',
   },
   skillsContainer: {
     flexDirection: 'row',
@@ -368,10 +458,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addSkillContainer: {
-    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
   },
   skillInput: {
-    marginBottom: 8,
+    flex: 1,
   },
   photosGrid: {
     flexDirection: 'row',
@@ -379,7 +472,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   photoContainer: {
-    width: '31%',
+    width: '48%',
     aspectRatio: 1,
     position: 'relative',
   },
@@ -390,11 +483,11 @@ const styles = StyleSheet.create({
   },
   removePhotoButton: {
     position: 'absolute',
-    top: -8,
     right: -8,
+    top: -8,
   },
   addPhotoButton: {
-    width: '31%',
+    width: '48%',
     aspectRatio: 1,
     borderWidth: 2,
     borderStyle: 'dashed',
@@ -402,40 +495,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  locationRatingContainer: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 16,
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  city: {
-    fontSize: 14,
-    color: '#666',
-  },
-  cityInput: {
-    height: 24,
-    fontSize: 14,
-    backgroundColor: 'transparent',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#666',
+  logoutButton: {
+    margin: 16,
   },
 });
 

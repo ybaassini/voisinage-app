@@ -27,11 +27,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import TimeAgo from '../components/TimeAgo';
 import { Post } from '../types/post';
 import { postService } from '../services/postService';
+import { useAuthContext } from '../contexts/AuthContext';
+import { useRequireAuth } from '../hooks/useRequireAuth';
 
 const PostDetailScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute<any>();
+  const { user } = useAuthContext();
+  const requireAuth = useRequireAuth();
   const [post, setPost] = useState<Post | null>(route.params?.post || null);
   const [loading, setLoading] = useState(!route.params?.post);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +51,12 @@ const PostDetailScreen = () => {
       fetchPost();
     }
   }, [route.params?.postId]);
+
+  useEffect(() => {
+    if (post && user) {
+      setIsLiked(post.likes?.includes(user.uid) || false);
+    }
+  }, [post, user]);
 
   const fetchPost = async () => {
     try {
@@ -101,6 +111,62 @@ const PostDetailScreen = () => {
         }
       });
     }
+  };
+
+  const handleReply = () => {
+    requireAuth(() => {
+      navigation.navigate('Chat', {
+        conversationId: undefined,
+        postId: post.id,
+        recipientId: post.requestor.id,
+      });
+    });
+  };
+
+  const handleLike = async () => {
+    requireAuth(async () => {
+      try {
+        await postService.toggleLike(post.id, user.uid);
+        // Mettre à jour l'état local du post
+        setPost(prevPost => {
+          if (!prevPost) return null;
+          const likes = prevPost.likes || [];
+          return {
+            ...prevPost,
+            likes: isLiked
+              ? likes.filter(id => id !== user.uid)
+              : [...likes, user.uid]
+          };
+        });
+        setIsLiked(!isLiked);
+      } catch (error) {
+        console.error('Erreur lors du like:', error);
+      }
+    });
+  };
+
+  const renderActionButtons = () => {
+    return (
+      <Animated.View 
+        entering={FadeInDown.delay(500)}
+        style={styles.actionButtons}
+      >
+        <Button
+          mode="contained"
+          icon="message-reply"
+          onPress={handleReply}
+          style={styles.replyButton}
+        >
+          Répondre
+        </Button>
+        <IconButton
+          icon={isLiked ? "heart" : "heart-outline"}
+          mode="contained"
+          onPress={handleLike}
+          style={styles.likeButton}
+        />
+      </Animated.View>
+    );
   };
 
   if (loading) {
@@ -239,25 +305,7 @@ const PostDetailScreen = () => {
         entering={FadeInDown}
         style={[styles.bottomBar, { backgroundColor: theme.colors.surface }]}
       >
-        <TouchableOpacity
-          style={styles.likeButton}
-          onPress={() => setIsLiked(!isLiked)}
-        >
-          <MaterialCommunityIcons
-            name={isLiked ? 'heart' : 'heart-outline'}
-            size={28}
-            color={isLiked ? theme.colors.error : theme.colors.onSurfaceVariant}
-          />
-        </TouchableOpacity>
-
-        <Button
-          mode="contained"
-          onPress={handleContactPress}
-          icon="message-reply-text"
-          style={styles.contactButton}
-        >
-          Contacter
-        </Button>
+        {renderActionButtons()}
       </Animated.View>
     </View>
   );
@@ -358,11 +406,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.1)',
   },
-  likeButton: {
-    marginRight: 16,
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  contactButton: {
+  replyButton: {
     flex: 1,
+    marginRight: 8,
+  },
+  likeButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 8,
   },
 });
 

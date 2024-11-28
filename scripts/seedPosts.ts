@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD_kkFBrSweOuSt6Bzw7bvsM8EBTF1tlG8",
@@ -15,120 +15,176 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const samplePosts = [
-  {
-    category: 'Outils',
-    description: 'Je prête ma perceuse Bosch Professional GSB 18V-50 avec 2 batteries. Idéale pour les travaux de bricolage. Disponible ce weekend.',
-    photos: ['https://images.unsplash.com/photo-1586864387967-d02ef85d93e8'],
-    createdAt: new Date(),
-    requestor: {
-      id: 'user1',
-      name: 'Marie Dubois',
-      avatar: 'https://randomuser.me/api/portraits/women/1.jpg'
-    },
-    location: {
-      address: '15 Rue de la République, Lyon',
-      coordinates: {
-        latitude: 45.7640,
-        longitude: 4.8357
-      }
-    },
-    status: 'active'
-  },
-  {
-    category: 'Services',
-    description: 'Professeur de guitare depuis 10 ans, je propose des cours particuliers pour débutants et intermédiaires. Première séance gratuite.',
-    photos: ['https://images.unsplash.com/photo-1510915361894-db8b60106cb1'],
-    createdAt: new Date(),
-    requestor: {
-      id: 'user2',
-      name: 'Pierre Martin',
-      avatar: 'https://randomuser.me/api/portraits/men/1.jpg'
-    },
-    location: {
-      address: '8 Avenue Jean Jaurès, Lyon',
-      coordinates: {
-        latitude: 45.7578,
-        longitude: 4.8320
-      }
-    },
-    status: 'active'
-  },
-  {
-    category: 'Sports',
-    description: 'Recherche partenaire(s) pour jouer au tennis le weekend. Niveau intermédiaire. Je dispose de raquettes supplémentaires.',
-    photos: ['https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0'],
-    createdAt: new Date(),
-    requestor: {
-      id: 'user3',
-      name: 'Sophie Bernard',
-      avatar: 'https://randomuser.me/api/portraits/women/2.jpg'
-    },
-    location: {
-      address: 'Parc de la Tête d\'Or, Lyon',
-      coordinates: {
-        latitude: 45.7771,
-        longitude: 4.8520
-      }
-    },
-    status: 'active'
-  },
-  {
-    category: 'Education',
-    description: 'Je donne des cours de mathématiques niveau lycée. Spécialisé en préparation au bac S. Méthodologie et exercices personnalisés.',
-    createdAt: new Date(),
-    requestor: {
-      id: 'user4',
-      name: 'Lucas Petit',
-      avatar: 'https://randomuser.me/api/portraits/men/2.jpg'
-    },
-    location: {
-      address: '25 Rue de la Part-Dieu, Lyon',
-      coordinates: {
-        latitude: 45.7605,
-        longitude: 4.8570
-      }
-    },
-    status: 'active'
-  },
-  {
-    category: 'Outils',
-    description: 'Échelle télescopique 3.8m à emprunter. Parfaite pour travaux en hauteur. Très stable et facile à transporter.',
-    photos: ['https://images.unsplash.com/photo-1590674899484-d5640e854abe'],
-    createdAt: new Date(),
-    requestor: {
-      id: 'user5',
-      name: 'Thomas Roux',
-      avatar: 'https://randomuser.me/api/portraits/men/3.jpg'
-    },
-    location: {
-      address: '12 Rue Garibaldi, Lyon',
-      coordinates: {
-        latitude: 45.7512,
-        longitude: 4.8520
-      }
-    },
-    status: 'active'
-  }
-];
-
-async function seedPosts() {
-  try {
-    console.log('Début de l\'ajout des posts...');
-    
-    for (const post of samplePosts) {
-      const docRef = await addDoc(collection(db, 'posts'), {
-        ...post,
-        createdAt: new Date() // Assurer que chaque post a une date différente
-      });
-      console.log('Post ajouté avec ID:', docRef.id);
-    }
-    
-    console.log('Tous les posts ont été ajoutés avec succès!');
-  } catch (error) {
-    console.error('Erreur lors de l\'ajout des posts:', error);
-  }
+interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
 }
 
+// Fonction pour récupérer les utilisateurs depuis Firestore
+const getUsers = async (): Promise<User[]> => {
+  const usersRef = collection(db, 'users');
+  const snapshot = await getDocs(usersRef);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Omit<User, 'id'> }));
+};
+
+const samplePosts = async () => {
+  const users = await getUsers();
+  
+  // Trouver les utilisateurs par email
+  const findUser = (email: string) => users.find(u => u.email === email);
+  
+  const sophieUser = findUser('sophie.martin@example.com');
+  const marcUser = findUser('marc.dubois@example.com');
+  const emmaUser = findUser('emma.petit@example.com');
+  const thomasUser = findUser('thomas.leroy@example.com');
+
+  return [
+    {
+      category: 'Jardinage',
+      description: 'Je propose mon aide pour la taille des haies et l\'entretien de votre jardin. Équipement professionnel et expérience de plusieurs années.',
+      photos: ['https://images.unsplash.com/photo-1416879595882-3373a0480b5b'],
+      createdAt: new Date(),
+      requestor: {
+        id: sophieUser?.id || 'unknown',
+        name: sophieUser?.displayName || 'Sophie Martin',
+        avatar: sophieUser?.photoURL || null
+      },
+      location: {
+        address: '15 Rue des Lilas, 75020 Paris',
+        coordinates: {
+          latitude: 48.8566,
+          longitude: 2.3522
+        }
+      },
+      status: 'active'
+    },
+    {
+      category: 'Bricolage',
+      description: 'Électricien professionnel disponible pour petits travaux : installation de prises, diagnostic, réparations. Devis gratuit.',
+      photos: ['https://images.unsplash.com/photo-1621905251189-08b45d6a269e'],
+      createdAt: new Date(),
+      requestor: {
+        id: marcUser?.id || 'unknown',
+        name: marcUser?.displayName || 'Marc Dubois',
+        avatar: marcUser?.photoURL || null
+      },
+      location: {
+        address: '8 Avenue des Roses, 75018 Paris',
+        coordinates: {
+          latitude: 48.8546,
+          longitude: 2.3527
+        }
+      },
+      status: 'active'
+    },
+    {
+      category: 'Informatique',
+      description: 'Je peux vous aider à configurer votre ordinateur, installer des logiciels, résoudre des problèmes de connexion. Étudiante en informatique.',
+      photos: ['https://images.unsplash.com/photo-1517694712202-14dd9538aa97'],
+      createdAt: new Date(),
+      requestor: {
+        id: emmaUser?.id || 'unknown',
+        name: emmaUser?.displayName || 'Emma Petit',
+        avatar: emmaUser?.photoURL || null
+      },
+      location: {
+        address: '25 Rue du Commerce, 75015 Paris',
+        coordinates: {
+          latitude: 48.8576,
+          longitude: 2.3512
+        }
+      },
+      status: 'active'
+    },
+    {
+      category: 'Cuisine',
+      description: 'Chef cuisinier à la retraite, je propose des cours de cuisine française traditionnelle à domicile. Spécialités : sauces, pâtisserie.',
+      photos: ['https://images.unsplash.com/photo-1556911220-bff31c812dba'],
+      createdAt: new Date(),
+      requestor: {
+        id: thomasUser?.id || 'unknown',
+        name: thomasUser?.displayName || 'Thomas Leroy',
+        avatar: thomasUser?.photoURL || null
+      },
+      location: {
+        address: '12 Rue de la Gaité, 75014 Paris',
+        coordinates: {
+          latitude: 48.8586,
+          longitude: 2.3532
+        }
+      },
+      status: 'active'
+    },
+    {
+      category: 'Jardinage',
+      description: 'Cherche aide pour créer un petit potager sur mon balcon. Conseils et assistance bienvenus !',
+      createdAt: new Date(),
+      requestor: {
+        id: emmaUser?.id || 'unknown',
+        name: emmaUser?.displayName || 'Emma Petit',
+        avatar: emmaUser?.photoURL || null
+      },
+      location: {
+        address: '25 Rue du Commerce, 75015 Paris',
+        coordinates: {
+          latitude: 48.8576,
+          longitude: 2.3512
+        }
+      },
+      status: 'active'
+    },
+    {
+      category: 'Bricolage',
+      description: 'Besoin d\'aide pour monter des meubles IKEA (armoire, table et chaises). Outils disponibles sur place.',
+      createdAt: new Date(),
+      requestor: {
+        id: sophieUser?.id || 'unknown',
+        name: sophieUser?.displayName || 'Sophie Martin',
+        avatar: sophieUser?.photoURL || null
+      },
+      location: {
+        address: '15 Rue des Lilas, 75020 Paris',
+        coordinates: {
+          latitude: 48.8566,
+          longitude: 2.3522
+        }
+      },
+      status: 'active'
+    }
+  ];
+};
+
+const seedPosts = async () => {
+  try {
+    console.log('Début de la création des posts...');
+    
+    const posts = await samplePosts();
+    
+    for (const post of posts) {
+      await addDoc(collection(db, 'posts'), {
+        ...post,
+        createdAt: new Date(),
+        likes: []
+      });
+      console.log(`Post créé pour ${post.requestor.name}`);
+    }
+    
+    console.log('Tous les posts ont été créés avec succès !');
+  } catch (error) {
+    console.error('Erreur lors de la création des posts:', error);
+  }
+};
+
 // Exécuter le script
-seedPosts();
+console.log('Démarrage du script de création des posts...');
+seedPosts()
+  .then(() => {
+    console.log('Script terminé avec succès');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Erreur lors de l\'exécution du script:', error);
+    process.exit(1);
+  });

@@ -1,4 +1,4 @@
-import { collection, query, where, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, Timestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { Post, CreatePostData } from '../types/post';
@@ -162,6 +162,28 @@ export const postService = {
       })) as Post[];
     } catch (error) {
       console.error('Erreur lors de la récupération des posts par catégorie:', error);
+      throw error;
+    }
+  },
+
+  // Ajouter ou retirer un like
+  async toggleLike(postId: string, userId: string): Promise<void> {
+    try {
+      const postRef = doc(db, POSTS_COLLECTION, postId);
+      const postDoc = await getDoc(postRef);
+
+      if (!postDoc.exists()) {
+        throw new Error('Post non trouvé');
+      }
+
+      const likes = postDoc.data().likes || [];
+      const isLiked = likes.includes(userId);
+
+      await updateDoc(postRef, {
+        likes: isLiked ? arrayRemove(userId) : arrayUnion(userId)
+      });
+    } catch (error) {
+      console.error('Erreur lors du toggle like:', error);
       throw error;
     }
   },

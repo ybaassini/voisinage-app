@@ -17,6 +17,7 @@ export type Post = {
     };
   };
   status: 'active' | 'completed' | 'cancelled';
+  likes?: string[]; // IDs des utilisateurs qui ont aimé le post
 };
 
-export type CreatePostData = Omit<Post, 'id' | 'createdAt'>;
+export type CreatePostData = Omit<Post, 'id' | 'createdAt' | 'likes'>;
