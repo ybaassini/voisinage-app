@@ -7,13 +7,13 @@ import { Platform, View, StyleSheet, Text } from 'react-native';
 import { IconButton } from 'react-native-paper';
 
 import HomeScreen from '../screens/HomeScreen';
-import MessagesScreen from '../screens/MessagesScreen';
 import PostScreen from '../screens/PostScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import Logo from '../components/Logo';
+import ConversationsScreen from '../screens/ConversationsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -152,7 +152,7 @@ const MainTabs = () => {
       />
       <Tab.Screen
         name="Messages"
-        component={MessagesScreen}
+        component={ConversationsScreen}
         options={{
           title: 'Messages',
           tabBarIcon: ({ color, size }) => (

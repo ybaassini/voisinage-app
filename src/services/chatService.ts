@@ -1,156 +1,393 @@
-import { collection, query, where, orderBy, getDocs, addDoc, doc, updateDoc, getDoc, Timestamp, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { ref, push, set, onValue, update, get, query, orderByChild, equalTo } from 'firebase/database';
+import { database } from '../config/firebase';
 import { Message, Conversation, CreateMessageData, CreateConversationData } from '../types/chat';
 
-const CONVERSATIONS_COLLECTION = 'conversations';
-const MESSAGES_COLLECTION = 'messages';
+const CONVERSATIONS_REF = 'conversations';
+const MESSAGES_REF = 'messages';
+const USER_CONVERSATIONS_REF = 'user_conversations';
+
+// Type pour les données étendues du message
+interface ExtendedMessageData extends CreateMessageData {
+  recipientId: string;
+  recipientName?: string;
+  recipientAvatar?: string;
+  postId?: string;
+}
 
 export const chatService = {
-  // Créer une nouvelle conversation
-  async createConversation(data: CreateConversationData): Promise<Conversation> {
+  // Vérifier si une conversation existe
+  async checkConversationExists(conversationId: string): Promise<boolean> {
     try {
-      const conversationData = {
-        ...data,
-        participantIds: data.participants.map(p => p.id),
-        updatedAt: Timestamp.fromDate(new Date()),
-      };
-
-      const docRef = await addDoc(collection(db, CONVERSATIONS_COLLECTION), conversationData);
-      return {
-        id: docRef.id,
-        ...conversationData,
-        updatedAt: conversationData.updatedAt.toDate(),
-      } as Conversation;
+      console.log('🔍 Vérification de l\'existence de la conversation:', conversationId);
+      const conversationRef = ref(database, `${CONVERSATIONS_REF}/${conversationId}`);
+      const snapshot = await get(conversationRef);
+      const exists = snapshot.exists();
+      console.log(exists ? '✅ Conversation trouvée' : '❌ Conversation non trouvée');
+      return exists;
     } catch (error) {
-      console.error('Erreur lors de la création de la conversation:', error);
-      throw error;
+      console.error('❌ Erreur lors de la vérification de la conversation:', error);
+      return false;
     }
   },
 
-  // Récupérer les conversations d'un utilisateur
-  async getUserConversations(userId: string): Promise<Conversation[]> {
+  // Créer une nouvelle conversation
+  async createConversation(data: CreateConversationData): Promise<Conversation> {
+    console.log('📝 Création d\'une nouvelle conversation');
     try {
-      const q = query(
-        collection(db, CONVERSATIONS_COLLECTION),
-        where('participantIds', 'array-contains', userId),
-        orderBy('updatedAt', 'desc')
-      );
+      const conversationRef = ref(database, CONVERSATIONS_REF);
+      const newConversationRef = push(conversationRef);
+      const conversationId = newConversationRef.key;
 
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        updatedAt: doc.data().updatedAt.toDate(),
-        lastMessage: doc.data().lastMessage ? {
-          ...doc.data().lastMessage,
-          createdAt: doc.data().lastMessage.createdAt.toDate(),
-        } : undefined,
-      })) as Conversation[];
+      if (!conversationId) {
+        console.error('❌ Échec de la génération de l\'ID de conversation');
+        throw new Error('Failed to generate conversation ID');
+      }
+      console.log('🔑 ID de conversation généré:', conversationId);
+
+      const now = Date.now();
+      const conversationData = {
+        id: conversationId,
+        participants: data.participants,
+        participantIds: data.participants.map(p => p.id),
+        createdAt: now,
+        updatedAt: now,
+        lastMessage: null,
+        postId: data.postId || null,
+        unreadCounts: data.participants.reduce((acc, p) => ({ ...acc, [p.id]: 0 }), {}),
+      };
+
+      // Créer la conversation
+      console.log('💾 Enregistrement de la conversation...');
+      await set(newConversationRef, conversationData);
+      console.log('✅ Conversation créée avec succès');
+
+      // Ajouter les références aux conversations des utilisateurs
+      console.log('🔗 Ajout des références utilisateurs...');
+      for (const participant of data.participants) {
+        await set(ref(database, `${USER_CONVERSATIONS_REF}/${participant.id}/${conversationId}`), true);
+      }
+      console.log('✅ Références utilisateurs ajoutées');
+
+      return {
+        ...conversationData,
+        createdAt: new Date(conversationData.createdAt),
+        updatedAt: new Date(conversationData.updatedAt),
+      } as Conversation;
     } catch (error) {
-      console.error('Erreur lors de la récupération des conversations:', error);
+      console.error('❌ Erreur lors de la création de la conversation:', error);
       throw error;
     }
   },
 
   // Envoyer un message
-  async sendMessage(data: CreateMessageData): Promise<Message> {
+  async sendMessage(data: ExtendedMessageData): Promise<Message> {
+    console.log('📝 Début de sendMessage avec les données:', data);
+    
     try {
+      let targetConversationId = data.conversationId;
+      
+      // Si pas de conversationId ou si la conversation n'existe pas, en créer une nouvelle
+      if (!targetConversationId || !(await this.checkConversationExists(targetConversationId))) {
+        console.log('⚠️ Pas de conversation existante, création d\'une nouvelle conversation...');
+        
+        if (!data.recipientId) {
+          console.error('❌ Impossible de créer une conversation sans recipientId');
+          throw new Error('RecipientId is required to create a new conversation');
+        }
+        
+        // Créer les participants pour la nouvelle conversation
+        const participants = [
+          {
+            id: data.senderId,
+            name: data.senderName,
+          },
+          {
+            id: data.recipientId,
+            name: data.recipientName || 'User',
+            avatar: data.recipientAvatar
+          }
+        ];
+
+        // Créer une nouvelle conversation
+        const newConversation = await this.createConversation({
+          participants,
+          postId: data.postId
+        });
+
+        // Utiliser l'ID de la nouvelle conversation
+        targetConversationId = newConversation.id;
+        console.log('✅ Nouvelle conversation créée avec ID:', targetConversationId);
+      }
+
+      const now = Date.now();
+      console.log('⏰ Timestamp généré:', now);
+
+      const messageRef = ref(database, MESSAGES_REF);
+      const newMessageRef = push(messageRef);
+      const messageId = newMessageRef.key;
+
+      if (!messageId) {
+        console.error('❌ Échec de la génération de l\'ID du message');
+        throw new Error('Failed to generate message ID');
+      }
+      console.log('🔑 ID du message généré:', messageId);
+
       const messageData = {
-        ...data,
-        createdAt: Timestamp.fromDate(new Date()),
+        id: messageId,
+        conversationId: targetConversationId,
+        senderId: data.senderId,
+        senderName: data.senderName,
+        text: data.text,
+        createdAt: now,
+        read: false,
       };
+      console.log('📋 Données du message préparées:', messageData);
 
       // Ajouter le message
-      const docRef = await addDoc(collection(db, MESSAGES_COLLECTION), messageData);
+      console.log('💾 Tentative d\'enregistrement du message...');
+      await set(newMessageRef, messageData);
+      console.log('✅ Message enregistré avec succès');
       
       // Mettre à jour la conversation
-      const conversationRef = doc(db, CONVERSATIONS_COLLECTION, data.conversationId);
-      await updateDoc(conversationRef, {
-        lastMessage: {
-          text: data.text,
-          senderId: data.senderId,
-          createdAt: messageData.createdAt,
-        },
-        updatedAt: messageData.createdAt,
-      });
+      const conversationRef = ref(database, `${CONVERSATIONS_REF}/${targetConversationId}`);
+      const conversationSnapshot = await get(conversationRef);
+      const conversation = conversationSnapshot.val();
+      
+      // Mettre à jour le dernier message
+      console.log('📝 Mise à jour du dernier message de la conversation');
+      const lastMessageData = {
+        id: messageId,
+        text: data.text,
+        senderId: data.senderId,
+        senderName: data.senderName,
+        createdAt: now,
+      };
+      
+      await set(ref(database, `${CONVERSATIONS_REF}/${targetConversationId}/lastMessage`), lastMessageData);
 
+      // Mettre à jour la date de mise à jour
+      console.log('⏰ Mise à jour de la date de la conversation');
+      await set(ref(database, `${CONVERSATIONS_REF}/${targetConversationId}/updatedAt`), now);
+
+      // Mettre à jour les compteurs de messages non lus
+      console.log('🔢 Mise à jour des compteurs de messages non lus');
+      for (const participantId of conversation.participantIds) {
+        if (participantId !== data.senderId) {
+          const currentCount = conversation.unreadCounts?.[participantId] || 0;
+          console.log(`📊 Mise à jour du compteur pour ${participantId}: ${currentCount} -> ${currentCount + 1}`);
+          await set(
+            ref(database, `${CONVERSATIONS_REF}/${targetConversationId}/unreadCounts/${participantId}`),
+            currentCount + 1
+          );
+        }
+      }
+      console.log('✅ Compteurs mis à jour avec succès');
+
+      console.log('✅ Message envoyé avec succès');
       return {
-        id: docRef.id,
         ...messageData,
-        createdAt: messageData.createdAt.toDate(),
+        conversationId: targetConversationId,
+        createdAt: new Date(messageData.createdAt),
       } as Message;
     } catch (error) {
-      console.error('Erreur lors de l\'envoi du message:', error);
+      console.error('❌ Erreur dans sendMessage:', error);
       throw error;
     }
   },
 
-  // Récupérer les messages d'une conversation
-  async getConversationMessages(conversationId: string): Promise<Message[]> {
+  // Trouver une conversation existante par postId et participants
+  async findConversationByPostAndParticipants(postId: string, participantIds: string[]): Promise<Conversation | null> {
     try {
-      const q = query(
-        collection(db, MESSAGES_COLLECTION),
-        where('conversationId', '==', conversationId),
-        orderBy('createdAt', 'asc')
-      );
+      console.log('🔍 Recherche d\'une conversation existante:', { postId, participantIds });
+      const conversationsRef = ref(database, CONVERSATIONS_REF);
+      
+      // Récupérer toutes les conversations
+      const snapshot = await get(conversationsRef);
+      if (!snapshot.exists()) {
+        console.log('❌ Aucune conversation trouvée');
+        return null;
+      }
 
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
-      })) as Message[];
+      // Filtrer les conversations en mémoire
+      const conversations = Object.values(snapshot.val()) as Conversation[];
+      const existingConversation = conversations.find(conv => {
+        const hasMatchingPostId = conv.postId === postId;
+        const hasAllParticipants = participantIds.every(id => conv.participantIds.includes(id));
+        const sameParticipantsCount = conv.participantIds.length === participantIds.length;
+        return hasMatchingPostId && hasAllParticipants && sameParticipantsCount;
+      });
+
+      if (existingConversation) {
+        console.log('✅ Conversation existante trouvée:', existingConversation.id);
+        return existingConversation;
+      }
+
+      console.log('❌ Aucune conversation trouvée avec ces critères');
+      return null;
     } catch (error) {
-      console.error('Erreur lors de la récupération des messages:', error);
-      throw error;
+      console.error('❌ Erreur lors de la recherche de la conversation:', error);
+      return null;
     }
   },
 
-  // Écouter les nouveaux messages d'une conversation
+  // S'abonner aux messages d'une conversation
   subscribeToMessages(conversationId: string, callback: (messages: Message[]) => void) {
-    const q = query(
-      collection(db, MESSAGES_COLLECTION),
-      where('conversationId', '==', conversationId),
-      orderBy('createdAt', 'asc')
+    const messagesQuery = query(
+      ref(database, MESSAGES_REF),
+      orderByChild('conversationId'),
+      equalTo(conversationId)
     );
 
-    return onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
-      })) as Message[];
-      callback(messages);
+    return onValue(messagesQuery, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      const messages = Object.values(snapshot.val()).map(message => ({
+        ...message,
+        createdAt: new Date(message.createdAt),
+      }));
+
+      callback(messages.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
     });
   },
 
   // Marquer les messages comme lus
   async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
-    if (!conversationId || !userId) return;
-    
     try {
-      const q = query(
-        collection(db, MESSAGES_COLLECTION),
-        where('conversationId', '==', conversationId),
-        where('read', '==', false)
+      const messagesQuery = query(
+        ref(database, MESSAGES_REF),
+        orderByChild('conversationId'),
+        equalTo(conversationId)
       );
 
-      const querySnapshot = await getDocs(q);
-      const batch = db.batch();
+      const snapshot = await get(messagesQuery);
+      if (!snapshot.exists()) return;
 
-      querySnapshot.docs.forEach((doc) => {
-        const message = doc.data();
-        // Ne marquer comme lu que les messages des autres utilisateurs
-        if (message.senderId !== userId) {
-          batch.update(doc.ref, { read: true });
+      const updates = {};
+      Object.entries(snapshot.val()).forEach(([messageId, message]) => {
+        if (message.senderId !== userId && !message.read) {
+          updates[`${MESSAGES_REF}/${messageId}/read`] = true;
         }
       });
 
-      await batch.commit();
+      if (Object.keys(updates).length > 0) {
+        await update(ref(database), updates);
+        await set(ref(database, `${CONVERSATIONS_REF}/${conversationId}/unreadCounts/${userId}`), 0);
+      }
     } catch (error) {
       console.error('Erreur lors du marquage des messages comme lus:', error);
-      // Ne pas propager l'erreur car ce n'est pas critique
-      console.error(error);
+    }
+  },
+
+  // S'abonner au nombre total de messages non lus
+  subscribeToTotalUnreadCount(userId: string, callback: (count: number) => void) {
+    const userConversationsRef = ref(database, `${USER_CONVERSATIONS_REF}/${userId}`);
+
+    return onValue(userConversationsRef, async (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(0);
+        return;
+      }
+
+      try {
+        let totalUnread = 0;
+        const conversationIds = Object.keys(snapshot.val());
+
+        for (const conversationId of conversationIds) {
+          const conversationRef = ref(database, `${CONVERSATIONS_REF}/${conversationId}`);
+          const conversationSnapshot = await get(conversationRef);
+          
+          if (conversationSnapshot.exists()) {
+            const conversation = conversationSnapshot.val();
+            totalUnread += conversation.unreadCounts?.[userId] || 0;
+          }
+        }
+
+        callback(totalUnread);
+      } catch (error) {
+        console.error('Erreur lors du calcul du nombre total de messages non lus:', error);
+        callback(0);
+      }
+    });
+  },
+
+  // S'abonner aux conversations d'un utilisateur
+  subscribeToConversations(userId: string, callback: (conversations: Conversation[]) => void) {
+    const userConversationsRef = ref(database, `${USER_CONVERSATIONS_REF}/${userId}`);
+
+    return onValue(userConversationsRef, async (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+
+      try {
+        const conversationIds = Object.keys(snapshot.val());
+        const conversations: Conversation[] = [];
+
+        for (const conversationId of conversationIds) {
+          const conversationRef = ref(database, `${CONVERSATIONS_REF}/${conversationId}`);
+          const conversationSnapshot = await get(conversationRef);
+          
+          if (conversationSnapshot.exists()) {
+            const conversationData = conversationSnapshot.val();
+            conversations.push({
+              ...conversationData,
+              createdAt: new Date(conversationData.createdAt),
+              updatedAt: new Date(conversationData.updatedAt),
+              lastMessage: conversationData.lastMessage ? {
+                ...conversationData.lastMessage,
+                createdAt: new Date(conversationData.lastMessage.createdAt),
+              } : null,
+            });
+          }
+        }
+
+        callback(conversations.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+      } catch (error) {
+        console.error('Erreur lors de la récupération des conversations:', error);
+        callback([]);
+      }
+    });
+  },
+
+  // Récupérer les conversations d'un utilisateur
+  async getUserConversations(userId: string): Promise<Conversation[]> {
+    try {
+      const userConversationsRef = ref(database, `${USER_CONVERSATIONS_REF}/${userId}`);
+      const snapshot = await get(userConversationsRef);
+
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      const conversationIds = Object.keys(snapshot.val());
+      const conversations: Conversation[] = [];
+
+      for (const conversationId of conversationIds) {
+        const conversationRef = ref(database, `${CONVERSATIONS_REF}/${conversationId}`);
+        const conversationSnapshot = await get(conversationRef);
+        
+        if (conversationSnapshot.exists()) {
+          const conversationData = conversationSnapshot.val();
+          conversations.push({
+            ...conversationData,
+            createdAt: new Date(conversationData.createdAt),
+            updatedAt: new Date(conversationData.updatedAt),
+            lastMessage: conversationData.lastMessage ? {
+              ...conversationData.lastMessage,
+              createdAt: new Date(conversationData.lastMessage.createdAt),
+            } : null,
+          });
+        }
+      }
+
+      return conversations.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    } catch (error) {
+      console.error('Erreur lors de la récupération des conversations:', error);
+      throw error;
     }
   },
 };

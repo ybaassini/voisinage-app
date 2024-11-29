@@ -143,7 +143,12 @@ const HomeScreen = ({ navigation }: any) => {
           <View style={styles.actionRight}>
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Chat', { postId: item.id })}
+              onPress={() => navigation.navigate('Chat', { 
+                postId: item.id,
+                recipientName: item.requestor.name,
+                recipientAvatar: item.requestor.avatar,
+                recipientId: item.requestor.id,
+              })}
             >
               <MaterialCommunityIcons
                 name="message-reply-text-outline"

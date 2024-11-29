@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getDatabase } from 'firebase/database';
 import Constants from 'expo-constants';
 
 // Votre configuration Firebase
@@ -12,7 +13,8 @@ const firebaseConfig = {
   storageBucket: "jirani-5f130.appspot.com",
   messagingSenderId: "141735429392",
   appId: "1:141735429392:web:103a6c5126192cfc1e5195",
-  measurementId: "G-K04LHYYPP0"
+  measurementId: "G-K04LHYYPP0",
+  databaseURL: "https://jirani-5f130-default-rtdb.europe-west1.firebasedatabase.app"
 };
 
 // Initialize Firebase
@@ -22,5 +24,6 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const database = getDatabase(app);
 
 export default app;

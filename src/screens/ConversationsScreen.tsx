@@ -1,157 +1,230 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
-import { Text, Avatar, Surface, useTheme, ActivityIndicator, TouchableRipple } from 'react-native-paper';
+import { View, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, Avatar, useTheme, Divider, Badge, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { chatService } from '../services/chatService';
 import { Conversation } from '../types/chat';
+import { useAuth } from '../hooks/useAuth';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useAuthContext } from '../contexts/AuthContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-const ConversationItem = ({ conversation, onPress }) => {
+const ConversationItem = ({ conversation, currentUserId, onPress }) => {
   const theme = useTheme();
-  const { user } = useAuthContext();
-  const otherParticipant = conversation.participants.find(p => p.id !== user?.uid);
-
+  const recipient = conversation.participants.find(p => p.id !== currentUserId);
+  const unreadCount = conversation.unreadCounts?.[currentUserId] || 0;
+  console.log('recipient', recipient);
+  
   return (
-    <TouchableRipple onPress={onPress}>
-      <Surface style={[styles.conversationItem, { backgroundColor: theme.colors.surface }]}>
-        <Avatar.Image
-          size={50}
-          source={otherParticipant?.avatar ? { uri: otherParticipant.avatar } : require('../assets/default-avatar.png')}
-        />
-        <View style={styles.conversationInfo}>
-          <Text variant="titleMedium" style={styles.participantName}>
-            {otherParticipant?.name || 'Utilisateur'}
+    <TouchableOpacity onPress={onPress} style={styles.conversationItem}>
+      <Avatar.Text
+        size={50}
+        label={recipient?.name?.charAt(0).toUpperCase() || '?'}
+        style={{ backgroundColor: theme.colors.primary }}
+      />
+      <View style={styles.conversationInfo}>
+        <View style={styles.conversationHeader}>
+          <Text variant="titleMedium" numberOfLines={1} style={styles.participantName}>
+            {recipient?.name || 'Utilisateur'}
           </Text>
           {conversation.lastMessage && (
-            <>
-              <Text variant="bodyMedium" numberOfLines={1} style={styles.lastMessage}>
-                {conversation.lastMessage.text}
-              </Text>
-              <Text variant="bodySmall" style={styles.timestamp}>
-                {format(conversation.lastMessage.createdAt, 'dd MMM yyyy', { locale: fr })}
-              </Text>
-            </>
+            <Text variant="bodySmall" style={styles.timestamp}>
+              {format(conversation.lastMessage.createdAt, 'dd MMM HH:mm', { locale: fr })}
+            </Text>
           )}
         </View>
-      </Surface>
-    </TouchableRipple>
+        
+        <View style={styles.lastMessageContainer}>
+          {conversation.lastMessage ? (
+            <Text
+              variant="bodyMedium"
+              numberOfLines={1}
+              style={[
+                styles.lastMessage,
+                unreadCount > 0 && { fontWeight: 'bold', color: theme.colors.primary }
+              ]}
+            >
+              {conversation.lastMessage.text}
+            </Text>
+          ) : (
+            <Text variant="bodyMedium" style={styles.noMessages}>
+              Aucun message
+            </Text>
+          )}
+          
+          {unreadCount > 0 && (
+            <Badge size={24} style={styles.unreadBadge}>
+              {unreadCount}
+            </Badge>
+          )}
+          
+          {conversation.postId && (
+            <MaterialCommunityIcons
+              name="post-outline"
+              size={16}
+              color={theme.colors.primary}
+              style={styles.postIcon}
+            />
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
-const ConversationsScreen = () => {
+export default function ConversationsScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [totalUnread, setTotalUnread] = useState(0);
   const navigation = useNavigation();
+  const { user } = useAuth();
   const theme = useTheme();
-  const { user } = useAuthContext();
 
   useEffect(() => {
-    if (!user) return;
-    loadConversations();
+    let conversationsUnsubscribe: (() => void) | undefined;
+    let unreadCountUnsubscribe: (() => void) | undefined;
+
+    if (user) {
+      // S'abonner aux conversations
+      conversationsUnsubscribe = chatService.subscribeToConversations(user.uid, (newConversations) => {
+        setConversations(newConversations);
+        setLoading(false);
+      });
+
+      // S'abonner au nombre total de messages non lus
+      unreadCountUnsubscribe = chatService.subscribeToTotalUnreadCount(user.uid, (count) => {
+        setTotalUnread(count);
+      });
+    }
+
+    return () => {
+      if (conversationsUnsubscribe) {
+        conversationsUnsubscribe();
+      }
+      if (unreadCountUnsubscribe) {
+        unreadCountUnsubscribe();
+      }
+    };
   }, [user]);
 
-  const loadConversations = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const userConversations = await chatService.getUserConversations(user.uid);
-      setConversations(userConversations);
-    } catch (err) {
-      console.error('Erreur lors du chargement des conversations:', err);
-      setError('Impossible de charger les conversations. Veuillez réessayer.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    // Mettre à jour le badge de l'onglet avec le nombre total de messages non lus
+    navigation.setOptions({
+      tabBarBadge: totalUnread > 0 ? totalUnread : undefined,
+    });
+  }, [totalUnread, navigation]);
 
   const handleConversationPress = (conversation: Conversation) => {
-    navigation.navigate('Chat', { conversationId: conversation.id });
+    const recipient = conversation.participants.find(p => p.id !== user?.uid);
+    navigation.navigate('Chat', {
+      conversationId: conversation.id,
+      recipientAvatar: recipient?.avatar,
+      recipientName: recipient?.name,
+      recipientId: recipient?.id,
+      postId: conversation.postId,
+
+    });
   };
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
-  if (error) {
+  if (!conversations.length) {
     return (
-      <View style={styles.centerContainer}>
-        <Text variant="bodyLarge" style={{ color: theme.colors.error }}>
-          {error}
+      <View style={styles.emptyContainer}>
+        <Text variant="titleMedium">Aucune conversation</Text>
+        <Text variant="bodyMedium" style={styles.emptyText}>
+          Commencez une conversation en répondant à une annonce
         </Text>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ConversationItem
             conversation={item}
+            currentUserId={user?.uid}
             onPress={() => handleConversationPress(item)}
           />
         )}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Text variant="bodyLarge">Aucune conversation</Text>
-          </View>
-        )}
+        ItemSeparatorComponent={() => <Divider />}
+        contentContainerStyle={styles.list}
       />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
   },
-  centerContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  listContent: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.7,
+  },
+  list: {
+    flexGrow: 1,
   },
   conversationItem: {
     flexDirection: 'row',
     padding: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    elevation: 2,
     alignItems: 'center',
   },
   conversationInfo: {
     flex: 1,
     marginLeft: 16,
   },
-  participantName: {
-    fontWeight: '600',
+  conversationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  lastMessage: {
-    marginTop: 4,
-    opacity: 0.7,
+  participantName: {
+    flex: 1,
+    marginRight: 8,
   },
   timestamp: {
-    marginTop: 4,
+    opacity: 0.7,
+  },
+  lastMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  lastMessage: {
+    flex: 1,
+    marginRight: 8,
+  },
+  noMessages: {
     opacity: 0.5,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 32,
+  unreadBadge: {
+    marginLeft: 8,
+  },
+  postIcon: {
+    marginLeft: 8,
   },
 });
-
-export default ConversationsScreen;

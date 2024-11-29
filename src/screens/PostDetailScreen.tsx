@@ -90,7 +90,12 @@ const PostDetailScreen = () => {
   });
 
   const handleContactPress = () => {
-    navigation.navigate('Chat', { postId: post?.id });
+    navigation.navigate('Chat', { 
+      postId: post?.id,
+      recipientId: post?.requestor.id,
+      recipientName: post?.requestor.name,
+      recipientAvatar: post?.requestor.avatar
+    });
   };
 
   const handleLocationPress = () => {
@@ -116,9 +121,10 @@ const PostDetailScreen = () => {
   const handleReply = () => {
     requireAuth(() => {
       navigation.navigate('Chat', {
-        conversationId: undefined,
         postId: post.id,
-        recipientId: post.requestor.id,
+        recipientId: post?.requestor.id,
+        recipientName: post?.requestor.name,
+        recipientAvatar: post?.requestor.avatar
       });
     });
   };
