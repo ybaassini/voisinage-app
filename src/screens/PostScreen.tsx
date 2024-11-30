@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     borderRadius: 16,
-    elevation: 4,
+    elevation: 0,
   },
   typeSelector: {
     marginBottom: 24,

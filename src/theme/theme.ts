@@ -114,25 +114,25 @@ export const theme = {
   colors: {
     ...MD3LightTheme.colors,
     // Couleurs principales
-    primary: '#FF7021',
-    primaryContainer: '#FFE0B2',
+    primary: '#352879',
+    primaryContainer: '#605596',
     onPrimary: '#FFFFFF',
     onPrimaryContainer: '#F57C00',
     
     // Couleurs secondaires
-    secondary: '#4CAF50',
-    secondaryContainer: '#C8E6C9',
+    secondary: '#F2711C',
+    secondaryContainer: '#FFE0B2',
     onSecondary: '#FFFFFF',
     onSecondaryContainer: '#2E7D32',
     
     // Couleurs d'accentuation
-    tertiary: '#2196F3',
+    tertiary: '#7FC1DC',
     tertiaryContainer: '#BBDEFB',
     onTertiary: '#FFFFFF',
     onTertiaryContainer: '#1976D2',
     
     // Couleurs de surface et de fond
-    background: '#F0F2F5', // Fond gris clair
+    background: '#F2F2F2', // Fond gris clair
     onBackground: '#212121',
     surface: '#FFFFFF', // Surface blanche pour les cartes et éléments
     surfaceVariant: '#FFFFFF', // Surface alternative aussi en blanc
@@ -180,10 +180,11 @@ export const theme = {
   // Ajout de styles pour les élévations
   elevation: {
     level0: {
-      shadowColor: '#000',
+      shadowColor: 'transparent',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0,
       shadowRadius: 0,
+      
       elevation: 0,
     },
     level1: {

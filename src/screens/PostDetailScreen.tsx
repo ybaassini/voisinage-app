@@ -195,7 +195,7 @@ const PostDetailScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -208,7 +208,7 @@ const PostDetailScreen = () => {
               style={styles.image}
               resizeMode="cover"
             />
-            <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
+            <View style={[styles.overlay, { backgroundColor: theme.colors.surface }]} />
           </Animated.View>
         )}
 
@@ -231,7 +231,7 @@ const PostDetailScreen = () => {
             <Chip
               icon="tag"
               mode="flat"
-              style={[styles.categoryChip, { backgroundColor: theme.colors.primaryContainer }]}
+              style={[styles.categoryChip, { backgroundColor: theme.colors.surface }]}
             >
               {post.category}
             </Chip>

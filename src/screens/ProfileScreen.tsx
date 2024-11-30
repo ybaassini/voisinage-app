@@ -198,7 +198,7 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView style={styles.scrollView}>
-        <Surface style={[styles.profileHeader, { backgroundColor: theme.colors.surface }]}>
+        <Surface style={[styles.profileHeader, { backgroundColor: theme.colors.background }]}>
           <View style={styles.avatarContainer}>
             <Avatar.Image
               size={100}
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 0,
   },
   scrollView: {
     flex: 1,
@@ -388,6 +388,12 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowColor: 'transparent',
+    borderBottomWidth: 0,
+    elevation: 0,
   },
   avatarContainer: {
     marginBottom: 16,

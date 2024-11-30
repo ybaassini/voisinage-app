@@ -157,10 +157,18 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   surface: {
     padding: 24,
     borderRadius: 16,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   form: {
     gap: 8,

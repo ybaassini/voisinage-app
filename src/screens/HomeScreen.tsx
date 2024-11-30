@@ -66,14 +66,11 @@ const HomeScreen = ({ navigation }: any) => {
           styles.card,
           {
             backgroundColor: theme.colors.surface,
-            elevation: 2,
-            shadowColor: '#000',
-            shadowOffset: {
-              width: 0,
-              height: 2,
-            },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
+            elevation: 0,
+            shadowColor: 'transparent', // Supprime l'ombre
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0,
+            shadowRadius: 0,
           }
         ]}
       >
@@ -98,9 +95,9 @@ const HomeScreen = ({ navigation }: any) => {
               <TimeAgo date={item.createdAt} style={{ color: theme.colors.onSurfaceVariant }} />
             </View>
 
-            <Surface style={[styles.categoryChip, { backgroundColor: theme.colors.primaryContainer }]}>
-              <MaterialCommunityIcons name="tag" size={16} color={theme.colors.primary} />
-              <Text style={[styles.categoryText, { color: theme.colors.primary }]}>
+            <Surface style={[styles.categoryChip, { backgroundColor: theme.colors.secondaryContainer }]}>
+              <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />
+              <Text style={[styles.categoryText, { color: theme.colors.secondary }]}>
                 {item.category}
               </Text>
             </Surface>
@@ -118,7 +115,9 @@ const HomeScreen = ({ navigation }: any) => {
           </Card.Content>
         </TouchableOpacity>
 
-        <Card.Actions style={styles.actionBanner}>
+        <Card.Actions style={[styles.actionBanner,{
+          justifyContent: 'space-between',
+        }]}>
           <View style={styles.actionLeft}>
             <TouchableOpacity
               style={styles.actionButton}
@@ -225,7 +224,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 10,
   },
   cardContent: {
     padding: 16,
@@ -251,6 +250,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     marginBottom: 12,
+    shadowColor: 'transparent', // Supprime l'ombre
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   categoryText: {
     marginLeft: 8,
@@ -267,6 +271,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   actionBanner: {
+    display: 'flex',
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,

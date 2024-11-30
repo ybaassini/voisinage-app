@@ -14,6 +14,7 @@ import ChatScreen from '../screens/ChatScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import Logo from '../components/Logo';
 import ConversationsScreen from '../screens/ConversationsScreen';
+import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -78,13 +79,14 @@ const MainTabs = () => {
           height: Platform.OS === 'ios' ? 88 : 68,
           backgroundColor: theme.colors.surface,
           borderTopWidth: 0,
-          elevation: 8,
+          borderBottomWidth: 0,
+          elevation: 0,
           shadowColor: '#000',
           shadowOffset: {
             width: 0,
-            height: -4,
+            height: 0,
           },
-          shadowOpacity: 0.1,
+          shadowOpacity: 0,
           shadowRadius: 8,
         },
         tabBarItemStyle: {
@@ -93,9 +95,10 @@ const MainTabs = () => {
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         headerStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.background,
           elevation: 0,
           shadowOpacity: 0,
+          borderBottomWidth: 0,
         },
         headerTitleStyle: {
           fontWeight: '600',
@@ -137,7 +140,7 @@ const MainTabs = () => {
               <View style={styles.publishButtonBackground}>
                 <MaterialCommunityIcons 
                   name="plus"
-                  size={32}
+                  size={24}
                   color="#FFFFFF"
                   style={styles.publishIcon}
                 />
@@ -193,12 +196,14 @@ const MainTabs = () => {
 
 const styles = StyleSheet.create({
   publishButtonContainer: {
-    width: 60,
-    height: 60,
-    marginTop: -30,
+    width: 50,
+    height: 50,
+    marginTop: 0,
   },
   publishButtonBackground: {
-    backgroundColor: '#FF9800',
+    backgroundColor: theme.colors.primary,
+    borderWidth: 4,
+    borderColor: '#FFF',
     width: '100%',
     height: '100%',
     borderRadius: 30,
@@ -207,11 +212,11 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 0,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   publishIcon: {
     marginTop: Platform.OS === 'ios' ? 0 : -2,
