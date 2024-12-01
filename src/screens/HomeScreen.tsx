@@ -9,6 +9,7 @@ import { TouchableOpacity } from 'react-native';
 import TimeAgo from '../components/TimeAgo';
 import { postService } from '../services/postService';
 import { Post } from '../types/post';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
 
 const HomeScreen = ({ navigation }: any) => {
   const theme = useTheme();
@@ -94,15 +95,19 @@ const HomeScreen = ({ navigation }: any) => {
               </View>
               <TimeAgo date={item.createdAt} style={{ color: theme.colors.onSurfaceVariant }} />
             </View>
+            
+            <Chip
+              icon={() => (
+                <Icon name="tag" size={16} color={theme.colors.secondary} />
+            )}
+              
+              mode="flat"
+              style={[styles.categoryChip, { backgroundColor: theme.colors.background, color: theme.colors.secondary }]}
+            >
+              {item.category}
+            </Chip>
 
-            <Surface style={[styles.categoryChip, { backgroundColor: theme.colors.secondaryContainer }]}>
-              <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />
-              <Text style={[styles.categoryText, { color: theme.colors.secondary }]}>
-                {item.category}
-              </Text>
-            </Surface>
-
-            <Text variant="bodyLarge" numberOfLines={3} style={styles.description}>
+            <Text variant="bodyLarge" numberOfLines={3} style={[styles.description, { color: theme.colors.onSurfaceVariant }]}>
               {item.description}
             </Text>
 
@@ -243,17 +248,20 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   categoryChip: {
+    display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 24,
+    marginBottom: 8,
     shadowColor: 'transparent', // Supprime l'ombre
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
     shadowRadius: 0,
+    borderWidth: 0,
+    borderStyle: 'solid',
     elevation: 0,
   },
   categoryText: {

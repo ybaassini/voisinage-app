@@ -114,16 +114,16 @@ export const theme = {
   colors: {
     ...MD3LightTheme.colors,
     // Couleurs principales
-    primary: '#352879',
-    primaryContainer: '#605596',
+    primary: '#494CA2',
+    primaryContainer: '#C1B5FAFF',
     onPrimary: '#FFFFFF',
-    onPrimaryContainer: '#F57C00',
+    onPrimaryContainer: '#494CA2',
     
     // Couleurs secondaires
     secondary: '#F2711C',
     secondaryContainer: '#FFE0B2',
     onSecondary: '#FFFFFF',
-    onSecondaryContainer: '#2E7D32',
+    onSecondaryContainer: '#F2711C',
     
     // Couleurs d'accentuation
     tertiary: '#7FC1DC',

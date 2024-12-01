@@ -7,6 +7,7 @@ import { chatService } from '../services/chatService';
 import { Message as ChatMessage } from '../types/chat';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { theme } from '../theme/theme';
 
 export default function ChatScreen({ navigation }: any) {
   const theme = useTheme();
@@ -181,8 +182,13 @@ export default function ChatScreen({ navigation }: any) {
     return (
       <InputToolbar
         {...props}
-        containerStyle={styles.inputToolbar}
+        containerStyle={[styles.inputToolbar, {
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.outline,
+        }]}
         primaryStyle={styles.inputPrimary}
+        textInputStyle={styles.textInput}
       />
     );
   };
@@ -291,5 +297,35 @@ const styles = StyleSheet.create({
   },
   backButton: {
     margin: 0,
+  },
+  inputToolbar: {
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    minHeight: 60,
+  },
+  inputPrimary: {
+    alignItems: 'center',
+  },
+  textInput: {
+    flex: 1,
+    marginHorizontal: 8,
+    fontSize: 16,
+    lineHeight: 20,
+    maxHeight: 100, // Permet au texte de s'étendre jusqu'à 5 lignes environ
+    minHeight: 40,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 12,
+    backgroundColor: theme.colors.background,
+    borderRadius: 20,
+  },
+  sendContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  sendIcon: {
+    marginRight: 8,
+    marginBottom: 8,
   },
 });

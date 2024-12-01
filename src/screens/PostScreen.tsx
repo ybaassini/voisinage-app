@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
+import { theme } from '../theme/theme';
 
 const PostScreen = () => {
   const theme = useTheme();
@@ -171,7 +172,7 @@ const PostScreen = () => {
               Nouvelle annonce
             </Text>
 
-            <Surface style={styles.card}>
+            <Surface style={[styles.card, { backgroundColor: theme.colors.background }]}>
               <Animated.View 
                 entering={SlideInRight.duration(500)}
                 style={styles.typeSelector}
@@ -299,6 +300,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     elevation: 0,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    backgroundColor: 'transparent',
   },
   typeSelector: {
     marginBottom: 24,
@@ -310,7 +316,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   inputOutline: {
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
+    borderWidth: 0,
   },
   descriptionInput: {
     minHeight: 120,
@@ -343,9 +351,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     height: 100,
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.background,
   },
   addImageButtonContent: {
     height: '100%',
+    backgroundColor: theme.colors.surface,
   },
   addMoreButton: {
     height: 100,
