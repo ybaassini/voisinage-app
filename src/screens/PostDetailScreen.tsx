@@ -201,16 +201,6 @@ const PostDetailScreen = () => {
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
-        {post.photos && post.photos.length > 0 && (
-          <Animated.View style={[styles.imageContainer, headerStyle]}>
-            <Image
-              source={{ uri: post.photos[0] }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-            <View style={[styles.overlay, { backgroundColor: theme.colors.surface }]} />
-          </Animated.View>
-        )}
 
         <Surface style={styles.contentContainer}>
           <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>

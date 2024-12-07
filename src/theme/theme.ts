@@ -132,7 +132,7 @@ export const theme = {
     onTertiaryContainer: '#1976D2',
     
     // Couleurs de surface et de fond
-    background: '#F2F2F2', // Fond gris clair
+    background: '#F2F8FF', // Fond gris clair
     onBackground: '#212121',
     surface: '#FFFFFF', // Surface blanche pour les cartes et éléments
     surfaceVariant: '#FFFFFF', // Surface alternative aussi en blanc

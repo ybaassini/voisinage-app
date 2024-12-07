@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
-import { Text, Card, Chip, useTheme, Searchbar, IconButton, Surface, Avatar, ActivityIndicator } from 'react-native-paper';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
+import { Text, Card, Chip, useTheme, IconButton, Avatar, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { TouchableOpacity } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import TimeAgo from '../components/TimeAgo';
 import { postService } from '../services/postService';
 import { Post } from '../types/post';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
+import { CATEGORIES } from '../constants/categories';
+import PostBottomSheet from '../components/PostBottomSheet';
 
 const HomeScreen = ({ navigation }: any) => {
   const theme = useTheme();
@@ -18,14 +17,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [likedPosts, setLikedPosts] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<string | null>(null);
-
-  const categories = [
-    { id: 'all', label: 'Tout', icon: 'view-grid' },
-    { id: 'tools', label: 'Outils', icon: 'tools' },
-    { id: 'services', label: 'Services', icon: 'account-wrench' },
-    { id: 'sports', label: 'Sports', icon: 'basketball' },
-    { id: 'education', label: 'Éducation', icon: 'school' },
-  ];
+  const [postSheetVisible, setPostSheetVisible] = useState(false);
 
   const fetchPosts = async () => {
     try {
@@ -43,75 +35,119 @@ const HomeScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     fetchPosts();
-  }, []); // Charger les posts au montage du composant
+  }, []);
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchPosts();
   }, []);
 
-  const handleLike = (postId: string) => {
+  const handleLike = useCallback((postId: string) => {
     setLikedPosts(prev => ({
       ...prev,
       [postId]: !prev[postId]
     }));
-  };
+  }, []);
 
-  const renderItem = ({ item, index }: { item: Post; index: number }) => (
+  const navigateToChat = useCallback((item: Post) => {
+    navigation.navigate('Chat', { 
+      postId: item.id,
+      recipientName: item.requestor.name,
+      recipientAvatar: item.requestor.avatar,
+      recipientId: item.requestor.id,
+    });
+  }, [navigation]);
+
+  const navigateToPostDetail = useCallback((post: Post) => {
+    navigation.navigate('PostDetail', { post });
+  }, [navigation]);
+
+  const renderPostHeader = useCallback(({ item }: { item: Post }) => (
+    <View style={styles.cardHeader}>
+      <View style={styles.userInfo}>
+        <Avatar.Image 
+          size={40} 
+          source={{ uri: item.requestor.avatar }} 
+          defaultSource={require('../assets/default-avatar.png')}
+        />
+        <View style={styles.userInfoText}>
+          <Text variant="titleMedium">{item.requestor.name}</Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            {item.location.address}
+          </Text>
+        </View>
+      </View>
+      <TimeAgo date={item.createdAt} style={{ color: theme.colors.onSurfaceVariant }} />
+    </View>
+  ), [theme.colors.onSurfaceVariant]);
+
+  const renderPostActions = useCallback(({ item }: { item: Post }) => (
+    <Card.Actions style={styles.actionBanner}>
+      <View style={styles.actionLeft}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => handleLike(item.id)}
+        >
+          <Icon
+            name={likedPosts[item.id] ? "heart" : "heart-outline"}
+            size={24}
+            color={likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant}
+          />
+          <Text style={[styles.actionText, { 
+            color: likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant 
+          }]}>
+            J'aime
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.actionRight}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigateToChat(item)}
+        >
+          <Icon
+            name="message-reply-text-outline"
+            size={24}
+            color={theme.colors.primary}
+          />
+          <Text style={[styles.actionText, { color: theme.colors.primary }]}>
+            Répondre
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Card.Actions>
+  ), [theme.colors, likedPosts, handleLike, navigateToChat]);
+
+  const renderItem = useCallback(({ item, index }: { item: Post; index: number }) => (
     <Animated.View
       entering={FadeInDown.delay(index * 100).springify()}
       style={styles.cardContainer}
     >
-      <Card 
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.colors.surface,
-            elevation: 0,
-            shadowColor: 'transparent', // Supprime l'ombre
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0,
-            shadowRadius: 0,
-          }
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => navigation.navigate('PostDetail', { post: item })}
-        >
+      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <TouchableOpacity onPress={() => navigateToPostDetail(item)}>
           <Card.Content style={styles.cardContent}>
-            <View style={styles.cardHeader}>
-              <View style={styles.userInfo}>
-                <Avatar.Image 
-                  size={40} 
-                  source={{ uri: item.requestor.avatar }} 
-                  defaultSource={require('../assets/default-avatar.png')}
-                />
-                <View style={styles.userInfoText}>
-                  <Text variant="titleMedium">{item.requestor.name}</Text>
-                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                    {item.location.address}
-                  </Text>
-                </View>
-              </View>
-              <TimeAgo date={item.createdAt} style={{ color: theme.colors.onSurfaceVariant }} />
-            </View>
+            {renderPostHeader({ item })}
             
             <Chip
-              icon={() => (
-                <Icon name="tag" size={16} color={theme.colors.secondary} />
-            )}
-              
+              icon={() => <Icon name="tag" size={16} color={theme.colors.secondary} />}
               mode="flat"
-              style={[styles.categoryChip, { backgroundColor: theme.colors.background, color: theme.colors.secondary }]}
+              style={[styles.categoryChip, { 
+                backgroundColor: theme.colors.background,
+                color: theme.colors.secondary 
+              }]}
             >
               {item.category}
             </Chip>
 
-            <Text variant="bodyLarge" numberOfLines={3} style={[styles.description, { color: theme.colors.onSurfaceVariant }]}>
+            <Text variant="bodyLarge" 
+              numberOfLines={3} 
+              style={[styles.description, { color: theme.colors.onSurfaceVariant }]}
+            >
               {item.description}
             </Text>
 
-            {item.photos && item.photos.length > 0 && (
+            {item.photos?.length > 0 && (
               <Card.Cover 
                 source={{ uri: item.photos[0] }} 
                 style={styles.coverImage}
@@ -120,91 +156,49 @@ const HomeScreen = ({ navigation }: any) => {
           </Card.Content>
         </TouchableOpacity>
 
-        <Card.Actions style={[styles.actionBanner,{
-          justifyContent: 'space-between',
-        }]}>
-          <View style={styles.actionLeft}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleLike(item.id)}
-            >
-              <MaterialCommunityIcons
-                name={likedPosts[item.id] ? "heart" : "heart-outline"}
-                size={24}
-                color={likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant}
-              />
-              <Text
-                style={[
-                  styles.actionText,
-                  { color: likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant }
-                ]}
-              >
-                J'aime
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.actionRight}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Chat', { 
-                postId: item.id,
-                recipientName: item.requestor.name,
-                recipientAvatar: item.requestor.avatar,
-                recipientId: item.requestor.id,
-              })}
-            >
-              <MaterialCommunityIcons
-                name="message-reply-text-outline"
-                size={24}
-                color={theme.colors.primary}
-              />
-              <Text style={[styles.actionText, { color: theme.colors.primary }]}>
-                Répondre
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </Card.Actions>
+        {renderPostActions({ item })}
       </Card>
     </Animated.View>
-  );
+  ), [theme.colors, renderPostHeader, renderPostActions, navigateToPostDetail]);
+
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <IconButton icon="refresh" size={24} onPress={fetchPosts} />
+      </View>
+    );
+  }
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {error ? (
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <IconButton
-            icon="refresh"
-            size={24}
-            onPress={fetchPosts}
+      <FlatList
+        data={posts}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
           />
-        </View>
-      ) : loading && !refreshing ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={posts}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[theme.colors.primary]}
-            />
-          }
-          ListEmptyComponent={() => (
-            <View style={styles.centerContainer}>
-              <Text>Aucune demande trouvée</Text>
-            </View>
-          )}
-        />
-      )}
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.centerContainer}>
+            <Text>Aucune demande trouvée</Text>
+          </View>
+        )}
+      />
     </SafeAreaView>
   );
 };
@@ -230,6 +224,8 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 10,
+    elevation: 0,
+    shadowColor: 'transparent',
   },
   cardContent: {
     padding: 16,
@@ -248,26 +244,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   categoryChip: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
     alignSelf: 'flex-start',
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 24,
     marginBottom: 8,
-    shadowColor: 'transparent', // Supprime l'ombre
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    borderWidth: 0,
-    borderStyle: 'solid',
     elevation: 0,
-  },
-  categoryText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
+    borderWidth: 0,
   },
   description: {
     marginBottom: 12,
@@ -279,7 +262,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   actionBanner: {
-    display: 'flex',
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -302,6 +284,15 @@ const styles = StyleSheet.create({
   actionText: {
     marginLeft: 8,
     fontWeight: '500',
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    width: 56,
+    height: 56,
   },
 });
 

@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Platform, View, StyleSheet, Text } from 'react-native';
-import { IconButton } from 'react-native-paper';
 
 import HomeScreen from '../screens/HomeScreen';
 import PostScreen from '../screens/PostScreen';
@@ -14,6 +13,7 @@ import ChatScreen from '../screens/ChatScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import Logo from '../components/Logo';
 import ConversationsScreen from '../screens/ConversationsScreen';
+import PostBottomSheet from '../components/PostBottomSheet';
 import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
@@ -56,7 +56,11 @@ const MainStack = () => {
 
 const MainTabs = () => {
   const theme = useTheme();
+  const [isPostSheetVisible, setIsPostSheetVisible] = useState(false);
   
+  // Debug logs
+  console.log('MainTabs render - isPostSheetVisible:', isPostSheetVisible);
+
   // Mock notification counts - à remplacer par des données réelles
   const unreadMessages = 3;
   const unreadNotifications = 2;
@@ -73,177 +77,171 @@ const MainTabs = () => {
   );
   
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarStyle: {
-          height: Platform.OS === 'ios' ? 88 : 68,
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 0,
-          borderBottomWidth: 0,
-          elevation: 0,
-          shadowColor: '#000',
-          shadowOffset: {
-            width: 0,
-            height: 0,
+    <>
+      <Tab.Navigator
+        screenOptions={{
+          tabBarStyle: {
+            height: Platform.OS === 'ios' ? 88 : 68,
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 0,
+            borderBottomWidth: 0,
+            elevation: 0,
+            shadowColor: '#000',
+            shadowOffset: {
+              width: 0,
+              height: 0,
+            },
+            shadowOpacity: 0,
+            shadowRadius: 8,
           },
-          shadowOpacity: 0,
-          shadowRadius: 8,
-        },
-        tabBarItemStyle: {
-          paddingVertical: Platform.OS === 'ios' ? 8 : 4,
-        },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-        headerStyle: {
-          backgroundColor: theme.colors.background,
-          elevation: 0,
-          shadowOpacity: 0,
-          borderBottomWidth: 0,
-        },
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          headerTitle: () => <Logo />,
-          tabBarIcon: ({ color, size }) => (
-            <TabIcon name="home" size={size} color={color} />
-          )
+          tabBarItemStyle: {
+            paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+          },
+          tabBarActiveTintColor: theme.colors.primary,
+          tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 0,
+          },
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
         }}
-      />
-      <Tab.Screen
-        name="Notifications"
-        component={NotificationsScreen}
-        options={{
-          title: 'Notifications',
-          tabBarIcon: ({ color, size }) => (
-            <TabIcon 
-              name="bell" 
-              size={size} 
-              color={color}
-              badge={unreadNotifications}
-            />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Post"
-        component={PostScreen}
-        options={{
-          title: 'Publier',
-          tabBarIcon: ({ color, size }) => (
-            <View style={styles.publishButtonContainer}>
-              <View style={styles.publishButtonBackground}>
-                <MaterialCommunityIcons 
-                  name="plus"
-                  size={24}
-                  color="#FFFFFF"
-                  style={styles.publishIcon}
-                />
+      >
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            headerTitle: () => <Logo />,
+            tabBarIcon: ({ color, size }) => (
+              <TabIcon name="home" size={size} color={color} />
+            )
+          }}
+        />
+        <Tab.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{
+            title: 'Notifications',
+            tabBarIcon: ({ color, size }) => (
+              <TabIcon 
+                name="bell" 
+                size={size} 
+                color={color}
+                badge={unreadNotifications}
+              />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Post"
+          component={EmptyComponent}
+          listeners={{
+            tabPress: (e) => {
+              // Prevent default navigation
+              e.preventDefault();
+              console.log('Tab Press - Before setIsPostSheetVisible');
+              // Show bottom sheet
+              setIsPostSheetVisible(true);
+              console.log('Tab Press - After setIsPostSheetVisible');
+            },
+          }}
+          options={{
+            title: 'Publier',
+            tabBarIcon: ({ color, size }) => (
+              <View style={styles.publishButtonContainer}>
+                <View style={[styles.publishButtonBackground, { backgroundColor: theme.colors.primary }]}>
+                  <MaterialCommunityIcons 
+                    name="plus"
+                    size={24}
+                    color="#FFFFFF"
+                    style={styles.publishIcon}
+                  />
+                </View>
               </View>
-            </View>
-          ),
-          tabBarLabel: ({ color }) => null,
-          tabBarIconStyle: {
-            marginTop: Platform.OS === 'ios' ? -10 : -20,
-          },
-        }}
+            ),
+            tabBarLabel: () => null,
+          }}
+        />
+        <Tab.Screen
+          name="Messages"
+          component={ConversationsScreen}
+          options={{
+            title: 'Messages',
+            tabBarIcon: ({ color, size }) => (
+              <TabIcon 
+                name="message" 
+                size={size} 
+                color={color}
+                badge={unreadMessages}
+              />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{
+            title: 'Profil',
+            tabBarIcon: ({ color, size }) => (
+              <TabIcon name="account" size={size} color={color} />
+            ),
+          }}
+        />
+      </Tab.Navigator>
+      {/* Render PostBottomSheet outside of Tab.Navigator but inside the fragment */}
+      <PostBottomSheet 
+        visible={isPostSheetVisible} 
+        onDismiss={() => {
+          console.log('PostBottomSheet onDismiss called');
+          setIsPostSheetVisible(false);
+        }} 
       />
-      <Tab.Screen
-        name="Messages"
-        component={ConversationsScreen}
-        options={{
-          title: 'Messages',
-          tabBarIcon: ({ color, size }) => (
-            <TabIcon 
-              name="message-text" 
-              size={size} 
-              color={color}
-              badge={unreadMessages}
-            />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={({ navigation, route }) => ({
-          title: 'Profil',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account" color={color} size={size} />
-          ),
-          headerRight: () => (
-            <IconButton
-              icon="pencil"
-              mode="contained"
-              onPress={() => {
-                if (route.params?.toggleEdit) {
-                  route.params.toggleEdit();
-                }
-              }}
-              style={{ marginRight: 8 }}
-            />
-          ),
-        })}
-      />
-    </Tab.Navigator>
+    </>
   );
 };
 
+// Composant vide pour le tab "Post"
+const EmptyComponent = () => null;
+
 const styles = StyleSheet.create({
-  publishButtonContainer: {
-    width: 50,
-    height: 50,
-    marginTop: 0,
-  },
-  publishButtonBackground: {
-    backgroundColor: theme.colors.primary,
-    borderWidth: 4,
-    borderColor: '#FFF',
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  publishIcon: {
-    marginTop: Platform.OS === 'ios' ? 0 : -2,
-  },
   iconContainer: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
   },
   badge: {
     position: 'absolute',
+    right: -6,
     top: -4,
-    right: -8,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFF',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   badgeText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '600',
-    paddingHorizontal: 4,
+  },
+  publishButtonContainer: {
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  publishButtonBackground: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  publishIcon: {
+    marginLeft: 1,
+    marginTop: 1,
   },
 });
 
