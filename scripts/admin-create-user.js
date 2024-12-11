@@ -15,11 +15,9 @@ async function createUser() {
     const userRecord = await admin.auth().createUser({
       email: 'test@voisinage.app',
       password: 'Test123!',
-      displayName: 'Utilisateur Test',
     });
     console.log('Successfully created new user:', userRecord.uid);
     console.log('Email:', userRecord.email);
-    console.log('Display Name:', userRecord.displayName);
   } catch (error) {
     console.log('Error creating new user:', error);
   }

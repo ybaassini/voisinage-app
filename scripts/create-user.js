@@ -18,20 +18,16 @@ async function createTestUser() {
   try {
     const email = 'test@voisinage.app';
     const password = 'Test123!';
-    const displayName = 'Utilisateur Test';
 
     console.log('Création du compte test...');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     
     console.log('Mise à jour du profil...');
-    await updateProfile(userCredential.user, {
-      displayName: displayName
-    });
+
 
     console.log('Compte test créé avec succès !');
     console.log('Email:', email);
     console.log('Mot de passe:', password);
-    console.log('Nom:', displayName);
   } catch (error) {
     console.error('Erreur lors de la création du compte:', error.message);
   }

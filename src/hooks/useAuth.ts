@@ -19,31 +19,26 @@ export const useAuth = () => {
     error: null,
   });
 
-  const createInitialProfile = async (user: User): Promise<UserProfile> => {
-    // Extraire le nom et le prénom de l'email si pas de displayName
-    let firstName = '', lastName = '';
-    if (user.displayName) {
-      [firstName, lastName] = user.displayName.split(' ');
-    } else if (user.email) {
-      firstName = user.email.split('@')[0];
-      lastName = '';
-    }
+  const createInitialProfile = async (user: UserProfile): Promise<UserProfile> => {
 
     const profileData: CreateUserProfileData = {
-      email: user.email || '',
-      firstName,
-      lastName,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       bio: 'Bienvenue sur mon profil !',
       location: {
         address: 'Non spécifiée',
-        coordinates: null,
+        coordinates: {
+          latitude: 0,
+          longitude: 0
+        },
       },
-      avatar: user.photoURL || null,
+      avatar: user.avatar,
       skills: [],
       portfolio: [],
     };
 
-    return await userService.createUserProfile(user.uid, profileData);
+    return await userService.createUserProfile(user.id, profileData);
   };
 
   const updateProfile = useCallback(async (userId: string, updates: Partial<UserProfile>) => {

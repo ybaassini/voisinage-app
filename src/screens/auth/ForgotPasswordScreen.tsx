@@ -8,6 +8,7 @@ import * as Yup from 'yup';
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
+import { theme } from '../../theme/theme';
 
 const validationSchema = Yup.object().shape({
   email: Yup.string()
@@ -168,6 +169,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   surface: {
+    backgroundColor: theme.colors.surface,
     padding: 24,
     borderRadius: 16,
   },

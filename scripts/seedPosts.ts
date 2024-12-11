@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { UserProfile } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -15,18 +16,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-interface User {
-  id: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-}
-
 // Fonction pour récupérer les utilisateurs depuis Firestore
-const getUsers = async (): Promise<User[]> => {
+const getUsers = async (): Promise<UserProfile[]> => {
   const usersRef = collection(db, 'users');
   const snapshot = await getDocs(usersRef);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Omit<User, 'id'> }));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Omit<UserProfile, 'id'> }));
 };
 
 const samplePosts = async () => {
@@ -48,8 +42,8 @@ const samplePosts = async () => {
       createdAt: new Date(),
       requestor: {
         id: sophieUser?.id || 'unknown',
-        name: sophieUser?.displayName || 'Sophie Martin',
-        avatar: sophieUser?.photoURL || null
+        name: `${sophieUser?.firstName} ${sophieUser?.lastName}`,
+        avatar: sophieUser?.avatar || null
       },
       location: {
         address: '15 Rue des Lilas, 75020 Paris',
@@ -67,8 +61,8 @@ const samplePosts = async () => {
       createdAt: new Date(),
       requestor: {
         id: marcUser?.id || 'unknown',
-        name: marcUser?.displayName || 'Marc Dubois',
-        avatar: marcUser?.photoURL || null
+        name: `${marcUser?.firstName} ${marcUser?.lastName}`,
+        avatar: marcUser?.avatar || null
       },
       location: {
         address: '8 Avenue des Roses, 75018 Paris',
@@ -86,8 +80,8 @@ const samplePosts = async () => {
       createdAt: new Date(),
       requestor: {
         id: emmaUser?.id || 'unknown',
-        name: emmaUser?.displayName || 'Emma Petit',
-        avatar: emmaUser?.photoURL || null
+        name: `${emmaUser?.firstName} ${emmaUser?.lastName}`,
+        avatar: emmaUser?.avatar || null
       },
       location: {
         address: '25 Rue du Commerce, 75015 Paris',
@@ -105,8 +99,8 @@ const samplePosts = async () => {
       createdAt: new Date(),
       requestor: {
         id: thomasUser?.id || 'unknown',
-        name: thomasUser?.displayName || 'Thomas Leroy',
-        avatar: thomasUser?.photoURL || null
+        name: `${thomasUser?.firstName} ${thomasUser?.lastName}`,
+        avatar: thomasUser?.avatar || null
       },
       location: {
         address: '12 Rue de la Gaité, 75014 Paris',
@@ -123,8 +117,8 @@ const samplePosts = async () => {
       createdAt: new Date(),
       requestor: {
         id: emmaUser?.id || 'unknown',
-        name: emmaUser?.displayName || 'Emma Petit',
-        avatar: emmaUser?.photoURL || null
+        name: `${emmaUser?.firstName} ${emmaUser?.lastName}`,
+        avatar: emmaUser?.avatar || null
       },
       location: {
         address: '25 Rue du Commerce, 75015 Paris',
@@ -141,8 +135,8 @@ const samplePosts = async () => {
       createdAt: new Date(),
       requestor: {
         id: sophieUser?.id || 'unknown',
-        name: sophieUser?.displayName || 'Sophie Martin',
-        avatar: sophieUser?.photoURL || null
+        name: `${sophieUser?.firstName} ${sophieUser?.lastName}`,
+        avatar: sophieUser?.avatar || null
       },
       location: {
         address: '15 Rue des Lilas, 75020 Paris',

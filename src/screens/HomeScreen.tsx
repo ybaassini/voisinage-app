@@ -62,13 +62,26 @@ const HomeScreen = ({ navigation }: any) => {
     navigation.navigate('PostDetail', { post });
   }, [navigation]);
 
+  const handleReply = async (post: Post) => {
+      try {
+        // Naviguer vers le chat
+        navigation.navigate('Chat', {
+          postId: post.id,
+          recipientId: post.requestor.id,
+          recipientName: post.requestor.name,
+          recipientAvatar: post.requestor.avatar
+        });
+      } catch (error) {
+        console.error('Erreur lors de la réponse:', error);
+      }
+  };
+
   const renderPostHeader = useCallback(({ item }: { item: Post }) => (
     <View style={styles.cardHeader}>
       <View style={styles.userInfo}>
         <Avatar.Image 
           size={40} 
           source={{ uri: item.requestor.avatar }} 
-          defaultSource={require('../assets/default-avatar.png')}
         />
         <View style={styles.userInfoText}>
           <Text variant="titleMedium">{item.requestor.name}</Text>
@@ -104,7 +117,7 @@ const HomeScreen = ({ navigation }: any) => {
       <View style={styles.actionRight}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => navigateToChat(item)}
+          onPress={() => handleReply(item)}
         >
           <Icon
             name="message-reply-text-outline"
@@ -117,7 +130,7 @@ const HomeScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
     </Card.Actions>
-  ), [theme.colors, likedPosts, handleLike, navigateToChat]);
+  ), [theme.colors, likedPosts, handleLike, handleReply]);
 
   const renderItem = useCallback(({ item, index }: { item: Post; index: number }) => (
     <Animated.View
@@ -147,7 +160,7 @@ const HomeScreen = ({ navigation }: any) => {
               {item.description}
             </Text>
 
-            {item.photos?.length > 0 && (
+            {item.photos && item.photos?.length > 0 && (
               <Card.Cover 
                 source={{ uri: item.photos[0] }} 
                 style={styles.coverImage}
@@ -177,6 +190,9 @@ const HomeScreen = ({ navigation }: any) => {
       </View>
     );
   }
+
+  console.log(posts);
+  
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>

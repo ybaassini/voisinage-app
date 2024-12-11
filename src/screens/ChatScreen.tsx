@@ -8,10 +8,11 @@ import { Message as ChatMessage } from '../types/chat';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { theme } from '../theme/theme';
+import { postService } from '../services/postService';
 
 export default function ChatScreen({ navigation }: any) {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const route = useRoute();
   const params = route.params as {
     conversationId?: string;
@@ -39,6 +40,8 @@ export default function ChatScreen({ navigation }: any) {
         console.log('❌ Utilisateur non connecté');
         return;
       }
+      console.log('📝 Initialisation du chat: ', userProfile);
+      
 
       // Si nous avons un conversationId, c'est une conversation existante
       if (params.conversationId) {
@@ -85,6 +88,7 @@ export default function ChatScreen({ navigation }: any) {
                 user: {
                   _id: msg.senderId,
                   name: msg.senderName,
+                  avatar: msg.senderAvatar
                 },
               }))
               .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -104,8 +108,18 @@ export default function ChatScreen({ navigation }: any) {
   }, [user, params.conversationId, params.recipientId, params.recipientName, params.postId, conversationId]);
 
   const onSend = useCallback(async (newMessages: IMessage[] = []) => {
-    if (!user) {
+    if (!user || !userProfile) {
       console.log('❌ Erreur: utilisateur non connecté');
+      return;
+    }
+
+    if (!params.recipientId || !params.recipientName) {
+      console.log('❌ Erreur: recipientId ou recipientName manquant');
+      return;
+    }
+
+    if (!params.postId) {
+      console.log('❌ Erreur: postId manquant');
       return;
     }
 
@@ -121,7 +135,7 @@ export default function ChatScreen({ navigation }: any) {
           participants: [
             { 
               id: user.uid,
-              name: user.displayName || 'User'
+              name: `${userProfile.firstName} ${userProfile.lastName}` || 'User'
             },
             { 
               id: params.recipientId,
@@ -133,13 +147,21 @@ export default function ChatScreen({ navigation }: any) {
         console.log('✅ Nouvelle conversation créée:', conversation.id);
         currentConversationId = conversation.id;
         setConversationId(conversation.id);
+         // Ajouter une réponse
+        await postService.addResponse(params.postId, {
+          userId: user.uid,
+          userName: `${userProfile.firstName} ${userProfile.lastName}` || 'Utilisateur',
+          userAvatar: userProfile.avatar || '',
+          userRating: userProfile.rating.average,
+        });
       }
 
       const messageData = {
         conversationId: currentConversationId,
         text: newMessages[0].text,
         senderId: user.uid,
-        senderName: user.displayName || 'User',
+        senderName: `${userProfile.firstName} ${userProfile.lastName}`|| 'User',
+        senderAvatar: userProfile.avatar || '',
         recipientId: params.recipientId || '',
         recipientName: params.recipientName || 'User',
         postId: params.postId,
@@ -210,7 +232,7 @@ export default function ChatScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Surface style={styles.header} elevation={2}>
+      <Surface style={styles.header} elevation={0}>
         <View style={styles.headerContent}>
           <IconButton
             icon="arrow-left"
@@ -270,8 +292,14 @@ const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
     paddingTop: Platform.OS === 'ios' ? 0 : 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.background,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   headerContent: {
     flexDirection: 'row',

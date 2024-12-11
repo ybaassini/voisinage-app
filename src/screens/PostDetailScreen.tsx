@@ -9,7 +9,7 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { Text, Avatar, Card, Button, IconButton, useTheme, MD3Theme, Surface, Chip } from 'react-native-paper';
+import { Text, Avatar, Card, Button, IconButton, useTheme, Surface, Chip, List, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   FadeInDown,
@@ -25,21 +25,24 @@ import Animated, {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import TimeAgo from '../components/TimeAgo';
-import { Post } from '../types/post';
+import { Post, PostResponse } from '../types/post';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
+import { theme } from '../theme/theme';
 
 const PostDetailScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute<any>();
-  const { user } = useAuthContext();
+  const { user, userProfile } = useAuthContext();
   const requireAuth = useRequireAuth();
   const [post, setPost] = useState<Post | null>(route.params?.post || null);
   const [loading, setLoading] = useState(!route.params?.post);
   const [error, setError] = useState<string | null>(null);
-  
+  const [responses, setResponses] = useState<PostResponse[]>([]);
+  const [loadingResponses, setLoadingResponses] = useState(false);
+
   const screenWidth = Dimensions.get('window').width;
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -58,6 +61,12 @@ const PostDetailScreen = () => {
     }
   }, [post, user]);
 
+  useEffect(() => {
+    if (post) {
+      fetchResponses();
+    }
+  }, [post]);
+
   const fetchPost = async () => {
     try {
       setLoading(true);
@@ -73,6 +82,20 @@ const PostDetailScreen = () => {
       setError('Impossible de charger les détails de la demande');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchResponses = async () => {
+    if (!post) return;
+    
+    try {
+      setLoadingResponses(true);
+      const fetchedResponses = await postService.getPostResponses(post.id);
+      setResponses(fetchedResponses);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des réponses:', error);
+    } finally {
+      setLoadingResponses(false);
     }
   };
 
@@ -118,14 +141,22 @@ const PostDetailScreen = () => {
     }
   };
 
-  const handleReply = () => {
-    requireAuth(() => {
-      navigation.navigate('Chat', {
-        postId: post.id,
-        recipientId: post?.requestor.id,
-        recipientName: post?.requestor.name,
-        recipientAvatar: post?.requestor.avatar
-      });
+  const handleReply = async () => {
+    requireAuth(async () => {
+      try {
+        // Rafraîchir la liste des réponses
+        fetchResponses();
+
+        // Naviguer vers le chat
+        navigation.navigate('Chat', {
+          postId: post.id,
+          recipientId: post?.requestor.id,
+          recipientName: post?.requestor.name,
+          recipientAvatar: post?.requestor.avatar
+        });
+      } catch (error) {
+        console.error('Erreur lors de la réponse:', error);
+      }
     });
   };
 
@@ -133,7 +164,6 @@ const PostDetailScreen = () => {
     requireAuth(async () => {
       try {
         await postService.toggleLike(post.id, user.uid);
-        // Mettre à jour l'état local du post
         setPost(prevPost => {
           if (!prevPost) return null;
           const likes = prevPost.likes || [];
@@ -175,6 +205,68 @@ const PostDetailScreen = () => {
     );
   };
 
+  const renderResponses = () => {
+    if (loadingResponses) {
+      return (
+        <View style={styles.noResponsesContainer}>
+          <Text>Chargement des réponses...</Text>
+        </View>
+      );
+    }
+    
+    if (responses.length === 0) {
+      return (
+        <View style={styles.noResponsesContainer}>
+          <Text style={styles.noResponsesText}>Aucune réponse pour le moment</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.responsesContainer}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
+          Réponses ({responses.length})
+        </Text>
+        {responses.map((response, index) => (
+          <Animated.View
+            key={response.id}
+            entering={FadeInRight.delay(index * 100)}
+            style={styles.responseItem}
+          >
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Profile', { userId: response.userId })}
+              style={styles.responseHeader}
+            >
+              <Avatar.Image
+                size={40}
+                source={{ uri: response.userAvatar }}
+              />
+              <View style={styles.responseInfo}>
+                <View style={styles.nameRatingContainer}>
+                  <Text style={styles.responseName}>{response.userName}</Text>
+                  {response.userRating !== undefined && (
+                    <View style={styles.ratingContainer}>
+                      <MaterialCommunityIcons
+                        name="star"
+                        size={16}
+                        color={theme.colors.primary}
+                      />
+                      <Text style={styles.ratingText}>
+                        {response.userRating.toFixed(1)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <TimeAgo date={response.createdAt} style={styles.responseTime} />
+              </View>
+            </TouchableOpacity>
+            {index < responses.length - 1 && <Divider style={styles.responseDivider} />}
+          </Animated.View>
+        ))}
+      </View>
+    );
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -195,114 +287,61 @@ const PostDetailScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
+    <View style={[styles.container]} >
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
-
-        <Surface style={styles.contentContainer}>
+        <Surface style={styles.contentContainer} elevation={0}>
           <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
-            <View style={styles.userContainer}>
-              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: post.requestor.id })}>
-                <Avatar.Image
-                  size={50}
-                  source={{ uri: post.requestor.avatar }}
-                  defaultSource={require('../assets/default-avatar.png')}
-                />
-              </TouchableOpacity>
-              <View style={styles.userInfo}>
-                <Text variant="titleMedium">{post.requestor.name}</Text>
-                <TimeAgo date={post.createdAt} style={{ color: theme.colors.onSurfaceVariant }} />
-              </View>
+            <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: post.requestor.id })}>
+              <Avatar.Image
+                size={50}
+                source={{ uri: post.requestor.avatar }}
+              />
+            </TouchableOpacity>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{post.requestor.name}</Text>
+              <TimeAgo date={post.createdAt} style={styles.timeAgo} />
             </View>
+          </Animated.View>
 
+          <Animated.View entering={FadeInDown.delay(300)}>
+            <Text style={styles.title}>{post.title}</Text>
+            <Text style={styles.description}>{post.description}</Text>
+          </Animated.View>
+
+          <Animated.View 
+            entering={FadeInDown.delay(400)}
+            style={styles.metadata}
+          >
             <Chip
               icon="tag"
               mode="flat"
-              style={[styles.categoryChip, { backgroundColor: theme.colors.surface }]}
+              style={[styles.categoryChip, { backgroundColor: theme.colors.background }]}
             >
               {post.category}
             </Chip>
-          </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(300)} style={styles.descriptionContainer}>
-            <Text
-              variant="bodyLarge"
-              style={[styles.description, { color: theme.colors.onSurface }]}
-              numberOfLines={showFullDescription ? undefined : 3}
-            >
-              {post.description}
-            </Text>
-            {post.description.length > 150 && (
-              <TouchableOpacity
-                onPress={() => setShowFullDescription(!showFullDescription)}
-                style={styles.readMoreButton}
-              >
-                <Text style={{ color: theme.colors.primary }}>
-                  {showFullDescription ? 'Voir moins' : 'Voir plus'}
-                </Text>
+            {post.location.address && (
+              <TouchableOpacity onPress={handleLocationPress}>
+                <Chip
+                  icon="map-marker"
+                  mode="flat"
+                  style={[styles.locationChip, { backgroundColor: theme.colors.background }]}
+                >
+                  {post.location.address}
+                </Chip>
               </TouchableOpacity>
             )}
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(400)} style={styles.locationContainer}>
-            <Surface style={styles.locationCard}>
-              <TouchableOpacity onPress={handleLocationPress} style={styles.locationContent}>
-                <MaterialCommunityIcons
-                  name="map-marker"
-                  size={24}
-                  color={theme.colors.primary}
-                />
-                <View style={styles.locationText}>
-                  <Text variant="titleSmall">Localisation</Text>
-                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                    {post.location.address}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={24}
-                  color={theme.colors.onSurfaceVariant}
-                />
-              </TouchableOpacity>
-            </Surface>
-          </Animated.View>
-
-          {post.photos && post.photos.length > 1 && (
-            <Animated.View entering={FadeInDown.delay(500)} style={styles.photosContainer}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>Photos</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.photosScroll}
-              >
-                {post.photos.map((photo, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    onPress={() => {
-                      // TODO: Ajouter une vue plein écran pour les photos
-                    }}
-                  >
-                    <Image
-                      source={{ uri: photo }}
-                      style={styles.thumbnailImage}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </Animated.View>
-          )}
+          {renderResponses()}
         </Surface>
       </Animated.ScrollView>
 
-      <Animated.View
-        entering={FadeInDown}
-        style={[styles.bottomBar, { backgroundColor: theme.colors.surface }]}
-      >
-        {renderActionButtons()}
-      </Animated.View>
+      {renderActionButtons()}
     </View>
   );
 };
@@ -310,111 +349,142 @@ const PostDetailScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.surface,
+    elevation: 0,
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorText: {
-    color: 'red',
-    marginBottom: 8,
-  },
-  imageContainer: {
-    width: '100%',
-    height: 250,
-    backgroundColor: '#f0f0f0',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
   contentContainer: {
-    flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: -20,
-    paddingHorizontal: 16,
-    paddingTop: 20,
+    padding: 16,
+    borderRadius: 0,
+    backgroundColor: theme.colors.surface,
   },
   header: {
-    marginBottom: 16,
-  },
-  userContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   userInfo: {
     marginLeft: 12,
     flex: 1,
   },
-  categoryChip: {
-    alignSelf: 'flex-start',
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  timeAgo: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
-  descriptionContainer: {
-    marginBottom: 24,
-  },
   description: {
+    fontSize: 16,
     lineHeight: 24,
+    marginBottom: 16,
   },
-  readMoreButton: {
-    marginTop: 8,
-  },
-  locationContainer: {
-    marginBottom: 24,
-  },
-  locationCard: {
-    borderRadius: 12,
-    elevation: 2,
-  },
-  locationContent: {
+  metadata: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
   },
-  locationText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  photosContainer: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    marginBottom: 12,
-  },
-  photosScroll: {
-    flexGrow: 0,
-  },
-  thumbnailImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 12,
+  categoryChip: {
     marginRight: 8,
   },
-  bottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+  locationChip: {
+    marginRight: 8,
   },
   actionButtons: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.background,
+    padding: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 24,
   },
   replyButton: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
   },
   likeButton: {
-    justifyContent: 'center',
+    margin: 0,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 8,
+  },
+  responsesContainer: {
+    marginTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  noResponsesContainer: {
+    padding: 16,
     alignItems: 'center',
-    padding: 8,
+  },
+  noResponsesText: {
+    fontSize: 16,
+    opacity: 0.7,
+  },
+  responseItem: {
+    marginBottom: 16,
+  },
+  responseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  responseInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  responseName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  responseTime: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  chatButton: {
+    marginLeft: 8,
+  },
+  responseDivider: {
+    marginVertical: 8,
+  },
+  nameRatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.surfaceVariant,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.primary,
   },
 });
 

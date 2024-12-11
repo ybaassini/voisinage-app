@@ -1,55 +1,24 @@
 import React from 'react';
-import { Text, StyleSheet, TextStyle } from 'react-native';
+import { Text, TextStyle } from 'react-native';
+import { formatDistanceToNow } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface TimeAgoProps {
-  date: Date;
+  date: number;
   style?: TextStyle;
 }
 
 const TimeAgo: React.FC<TimeAgoProps> = ({ date, style }) => {
-  const getTimeAgo = (date: Date): string => {
-    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-    
-    let interval = Math.floor(seconds / 31536000); // années
-    if (interval >= 1) {
-      return interval === 1 ? 'il y a 1 an' : `il y a ${interval} ans`;
-    }
-    
-    interval = Math.floor(seconds / 2592000); // mois
-    if (interval >= 1) {
-      return interval === 1 ? 'il y a 1 mois' : `il y a ${interval} mois`;
-    }
-    
-    interval = Math.floor(seconds / 86400); // jours
-    if (interval >= 1) {
-      return interval === 1 ? 'il y a 1 jour' : `il y a ${interval} jours`;
-    }
-    
-    interval = Math.floor(seconds / 3600); // heures
-    if (interval >= 1) {
-      return interval === 1 ? 'il y a 1 heure' : `il y a ${interval} heures`;
-    }
-    
-    interval = Math.floor(seconds / 60); // minutes
-    if (interval >= 1) {
-      return interval === 1 ? 'il y a 1 minute' : `il y a ${interval} minutes`;
-    }
-    
-    return seconds <= 10 ? 'à l\'instant' : `il y a ${Math.floor(seconds)} secondes`;
-  };
+  if (!date) return null;
 
-  return (
-    <Text style={[styles.text, style]}>
-      {getTimeAgo(date)}
-    </Text>
-  );
+  try {
+    const dateObj = new Date(date); // Convertir le timestamp Unix en millisecondes
+    const timeAgo = formatDistanceToNow(dateObj, { addSuffix: true, locale: fr });
+    return <Text style={style}>{timeAgo}</Text>;
+  } catch (error) {
+    console.error('Erreur lors du formatage de la date:', error);
+    return null;
+  }
 };
-
-const styles = StyleSheet.create({
-  text: {
-    fontSize: 12,
-    color: '#666',
-  },
-});
 
 export default TimeAgo;

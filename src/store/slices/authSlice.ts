@@ -22,10 +22,10 @@ const initialState: AuthState = {
 
 export const registerUser = createAsyncThunk(
   'auth/register',
-  async ({ email, password, displayName }: { email: string; password: string; displayName: string }, { rejectWithValue }) => {
+  async ({ email, password, firstName, lastName }: { email: string; password: string; firstName: string; lastName: string }, { rejectWithValue }) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName });
+      await updateProfile(userCredential.user, { displayName: `${firstName} ${lastName}` });
       return userCredential.user;
     } catch (error: any) {
       return rejectWithValue(error.message);

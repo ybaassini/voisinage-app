@@ -1,11 +1,12 @@
-import { collection, query, where, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, Timestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, Timestamp, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
-import { Post, CreatePostData } from '../types/post';
+import { Post, CreatePostData, PostResponse } from '../types/post';
 import { Platform } from 'react-native';
 import { fetch } from 'react-native-fetch-polyfill';
 
 const POSTS_COLLECTION = 'posts';
+const RESPONSES_COLLECTION = 'responses';
 
 export const postService = {
   // Récupérer toutes les demandes actives
@@ -184,6 +185,58 @@ export const postService = {
       });
     } catch (error) {
       console.error('Erreur lors du toggle like:', error);
+      throw error;
+    }
+  },
+
+  // Ajouter une réponse à un post
+  async addResponse(postId: string, responseData: Omit<PostResponse, 'id' | 'createdAt'>): Promise<void> {
+    try {
+      // Récupérer le profil utilisateur pour obtenir sa note moyenne
+      const userDoc = await db.collection('users').doc(responseData.userId).get();
+      const userData = userDoc.data();
+      const userRating = userData?.rating;
+
+      const responseRef = db.collection('posts').doc(postId).collection('responses').doc();
+      await responseRef.set({
+        ...responseData,
+        userRating,
+        id: responseRef.id,
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error adding response:', error);
+      throw error;
+    }
+  },
+
+  // Récupérer les réponses d'un post
+  async getPostResponses(postId: string): Promise<PostResponse[]> {
+    try {
+      const postRef = doc(db, POSTS_COLLECTION, postId);
+      const responsesRef = collection(postRef, RESPONSES_COLLECTION);
+      const q = query(responsesRef, orderBy('createdAt', 'desc'));
+      
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt.toDate().getTime() / 1000,
+      })) as PostResponse[];
+    } catch (error) {
+      console.error('Erreur lors de la récupération des réponses:', error);
+      throw error;
+    }
+  },
+
+  // Supprimer une réponse
+  async deleteResponse(postId: string, responseId: string): Promise<void> {
+    try {
+      const postRef = doc(db, POSTS_COLLECTION, postId);
+      const responseRef = doc(collection(postRef, RESPONSES_COLLECTION), responseId);
+      await deleteDoc(responseRef);
+    } catch (error) {
+      console.error('Erreur lors de la suppression de la réponse:', error);
       throw error;
     }
   },

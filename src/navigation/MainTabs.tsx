@@ -83,13 +83,12 @@ const MainTabs = () => {
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: 'Profil',
-          tabBarLabel: 'Profil',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account" size={size} color={color} />
+            <MaterialCommunityIcons name="account" color={color} size={size} />
           ),
         }}
       />
+      {/* Suppression des écrans PostDetail et Chat qui ne sont pas des onglets */}
     </Tab.Navigator>
   );
 };

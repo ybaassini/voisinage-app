@@ -43,12 +43,34 @@ const MainStack = () => {
       <Stack.Screen 
         name="PostDetail" 
         component={PostDetailScreen}
-        options={{ title: 'Détails de l\'annonce' }}
+        options={{ 
+          title: 'Détails de l\'annonce',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerShadowVisible: false,
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+          headerTintColor: theme.colors.onSurface,
+        }}
       />
       <Stack.Screen 
         name="Chat" 
         component={ChatScreen}
-        options={{ title: 'Discussion' }}
+        options={{ 
+          title: 'Discussion',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerShadowVisible: false,
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+          headerTintColor: theme.colors.onSurface,
+        }}
       />
     </Stack.Navigator>
   );
@@ -190,6 +212,7 @@ const MainTabs = () => {
             ),
           }}
         />
+
       </Tab.Navigator>
       {/* Render PostBottomSheet outside of Tab.Navigator but inside the fragment */}
       <PostBottomSheet 

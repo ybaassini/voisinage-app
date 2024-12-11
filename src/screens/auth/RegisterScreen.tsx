@@ -9,11 +9,15 @@ import { useAppDispatch, useAppSelector } from '../../store/store';
 import { registerUser } from '../../store/slices/authSlice';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
+import { theme } from '../../theme/theme';
 
 const validationSchema = Yup.object().shape({
-  displayName: Yup.string()
+  lastName: Yup.string()
     .min(2, 'Le nom doit contenir au moins 2 caractères')
     .required('Le nom est requis'),
+  firstName: Yup.string()
+    .min(2, 'Le prenom doit contenir au moins 2 caractères')
+    .required('Le prenom est requis'),
   email: Yup.string()
     .email('Email invalide')
     .required('L\'email est requis'),
@@ -36,7 +40,7 @@ const RegisterScreen = ({ navigation }: any) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleRegister = async (values: { displayName: string; email: string; password: string }) => {
+  const handleRegister = async (values: { firstName: string; lastName: string; email: string; password: string }) => {
     dispatch(registerUser(values));
   };
 
@@ -68,18 +72,27 @@ const RegisterScreen = ({ navigation }: any) => {
           >
             <Surface style={styles.surface} elevation={2}>
               <Formik
-                initialValues={{ displayName: '', email: '', password: '', confirmPassword: '' }}
+                initialValues={{ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' }}
                 validationSchema={validationSchema}
                 onSubmit={handleRegister}
               >
                 {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
                   <View style={styles.form}>
                     <CustomInput
+                      label="Prénom"
+                      value={values.firstName}
+                      onChangeText={handleChange('firstName')}
+                      onBlur={handleBlur('firstName')}
+                      error={touched.firstName ? errors.firstName : undefined}
+                      leftIcon="account"
+                    />
+
+                    <CustomInput
                       label="Nom complet"
-                      value={values.displayName}
-                      onChangeText={handleChange('displayName')}
-                      onBlur={handleBlur('displayName')}
-                      error={touched.displayName ? errors.displayName : undefined}
+                      value={values.lastName}
+                      onChangeText={handleChange('lastName')}
+                      onBlur={handleBlur('lastName')}
+                      error={touched.lastName ? errors.lastName : undefined}
                       leftIcon="account"
                     />
 
@@ -183,6 +196,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   surface: {
+    backgroundColor: theme.colors.surface,
     padding: 24,
     borderRadius: 16,
   },

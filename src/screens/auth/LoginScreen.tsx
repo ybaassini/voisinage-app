@@ -9,6 +9,8 @@ import { useAppDispatch, useAppSelector } from '../../store/store';
 import { loginUser } from '../../store/slices/authSlice';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
+import { th } from 'date-fns/locale';
+import { theme } from '../../theme/theme';
 
 const validationSchema = Yup.object().shape({
   email: Yup.string()
@@ -163,6 +165,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   surface: {
+    backgroundColor: theme.colors.surface,
     padding: 24,
     borderRadius: 16,
     shadowColor: 'transparent',

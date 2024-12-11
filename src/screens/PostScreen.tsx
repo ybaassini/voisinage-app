@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { Text, useTheme, TextInput, SegmentedButtons, Button, Menu, Divider } from 'react-native-paper';
+import { Text, useTheme, TextInput, Button, Menu, Divider } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -17,7 +17,7 @@ interface PostScreenProps {
 const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
   const theme = useTheme();
   const { user, userProfile } = useAuthContext();
-  const [type, setType] = useState('request');
+  const [type, setType] = useState<'request' | 'offer'>('request');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -40,9 +40,10 @@ const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
         photos,
         requestor: {
           id: user.uid,
-          name: userProfile.displayName || 'Utilisateur',
-          avatar: userProfile.photoURL || '',
+          name: `${userProfile.firstName} ${userProfile.lastName}` || 'Utilisateur',
+          avatar: userProfile.avatar || '',
         },
+        status: 'active',
         location: userProfile.location || { address: 'Non spécifié', coordinates: null },
       });
 
@@ -92,7 +93,9 @@ const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
             styles.categoryButton,
             { 
               borderColor: theme.colors.outline,
+              borderWidth: 0,
               backgroundColor: theme.colors.surface,
+              borderRadius: 4,
             }
           ]}
           onPress={() => setMenuVisible(true)}
@@ -150,13 +153,14 @@ const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
       style={[styles.container, isBottomSheet && { backgroundColor: theme.colors.background }]} 
       contentContainerStyle={styles.contentContainer}
     >
+      <Text style={[styles.title]}>Nouvelle demande</Text>
 
       <TextInput
         mode="outlined"
         label="Titre"
         value={title}
         onChangeText={setTitle}
-        style={styles.input}
+        style={[styles.input, { borderWidth: 0 }]}
       />
 
       <TextInput
@@ -215,12 +219,17 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
   },
-  segmentedButtons: {
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 16,
+    textAlign: 'center',
   },
   input: {
     marginBottom: 16,
     backgroundColor: theme.colors.surface,
+    borderWidth: 0,
+    borderColor: theme.colors.surface
   },
   sectionTitle: {
     fontSize: 16,
