@@ -1,9 +1,8 @@
 import { collection, query, where, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, Timestamp, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
-import { Post, CreatePostData, PostResponse } from '../types/post';
-import { Platform } from 'react-native';
-import { fetch } from 'react-native-fetch-polyfill';
+import { Post, CreatePostData, PostResponse, Location } from '../types/post';
+import * as geofireCommon from 'geofire-common';
 
 const POSTS_COLLECTION = 'posts';
 const RESPONSES_COLLECTION = 'responses';
@@ -21,11 +20,113 @@ export const postService = {
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
-      })) as Post[];
+        ...doc.data()
+      } as Post));
     } catch (error) {
-      console.error('Erreur lors de la récupération des posts:', error);
+      console.error('Error getting posts:', error);
+      throw error;
+    }
+  },
+
+  // Créer un nouveau post
+  async createPost(data: CreatePostData): Promise<string> {
+    try {
+      let postData = { ...data };
+      
+      // Générer les données geofire si les coordonnées sont disponibles
+      if (data.location?.coordinates) {
+        const { latitude, longitude } = data.location.coordinates;
+        const hash = geofireCommon.geohashForLocation([latitude, longitude]);
+        
+        postData.location = {
+          ...postData.location,
+          g: {
+            geohash: hash,
+            geopoint: {
+              latitude,
+              longitude
+            }
+          }
+        };
+      }
+
+      const postRef = await addDoc(collection(db, POSTS_COLLECTION), {
+        ...postData,
+        createdAt: serverTimestamp(),
+      });
+
+      return postRef.id;
+    } catch (error) {
+      console.error('Error creating post:', error);
+      throw error;
+    }
+  },
+
+  // Récupérer les posts à proximité
+  async getNearbyPosts(userLocation: Location, radiusInKm: number = 10): Promise<Post[]> {
+    try {
+      if (!userLocation.coordinates) {
+        throw new Error('User location coordinates are required');
+      }
+
+      const { latitude, longitude } = userLocation.coordinates;
+      const center = [latitude, longitude];
+      const radiusInM = radiusInKm * 1000;
+
+      // Générer les limites de la requête
+      const bounds = geofireCommon.geohashQueryBounds(center, radiusInM);
+      const posts: Post[] = [];
+
+      // Exécuter une requête pour chaque limite
+      const promises = bounds.map(b => {
+        const q = query(
+          collection(db, POSTS_COLLECTION),
+          where('status', '==', 'active'),
+          where('location.g.geohash', '>=', b[0]),
+          where('location.g.geohash', '<=', b[1])
+        );
+        return getDocs(q);
+      });
+
+      const snapshots = await Promise.all(promises);
+
+      // Traiter les résultats
+      for (const snap of snapshots) {
+        for (const doc of snap.docs) {
+          const post = { 
+            id: doc.id, 
+            distance: geofireCommon.distanceBetween(center, [
+              doc.data().location.g.geopoint.latitude,
+              doc.data().location.g.geopoint.longitude
+            ]),
+            ...doc.data() } as Post;
+          
+          // Vérifier que le post a des coordonnées valides
+          if (post.location?.g?.geopoint) {
+            const postLatLng = [
+              post.location.g.geopoint.latitude,
+              post.location.g.geopoint.longitude
+            ];
+
+            // Calculer la distance réelle
+            const distanceInKm = geofireCommon.distanceBetween(center, postLatLng)
+
+            // N'ajouter que les posts qui sont réellement dans le rayon
+            if (distanceInKm <= radiusInKm) {
+              // Ajouter la distance au post pour l'affichage
+              posts.push({
+                ...post,
+                distance: Math.round(distanceInKm * 10) / 10 // Arrondir à 1 décimale
+              });
+            }
+          }
+        }
+      }
+
+      // Trier par distance
+      return posts.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    } catch (error) {
+      console.error('Error getting nearby posts:', error);
       throw error;
     }
   },
@@ -39,66 +140,13 @@ export const postService = {
       if (docSnap.exists()) {
         return {
           id: docSnap.id,
-          ...docSnap.data(),
-          createdAt: docSnap.data().createdAt.toDate(),
+          ...docSnap.data()
         } as Post;
       }
       return null;
     } catch (error) {
       console.error('Erreur lors de la récupération du post:', error);
       throw error;
-    }
-  },
-
-  // Créer une nouvelle demande
-  async createPost(postData: CreatePostData, photoFiles?: Array<{ uri: string; type: string; name: string }>): Promise<Post> {
-    try {
-      // Upload des photos si présentes
-      const photoUrls = [];
-      if (photoFiles && photoFiles.length > 0) {
-        for (const file of photoFiles) {
-          try {
-            // Convertir l'URI en blob
-            const response = await fetch(file.uri);
-            const blob = await response.blob();
-
-            const photoRef = ref(storage, `posts/${Date.now()}_${file.name}`);
-            await uploadBytes(photoRef, blob);
-            const url = await getDownloadURL(photoRef);
-            photoUrls.push(url);
-          } catch (uploadError) {
-            console.error('Erreur lors de l\'upload de l\'image:', uploadError);
-            // Continue avec les autres images même si une échoue
-          }
-        }
-      }
-
-      // Préparer les données pour Firestore
-      const firestoreData = {
-        ...postData,
-        photos: photoUrls,
-        createdAt: Timestamp.fromDate(new Date()),
-        status: postData.status || 'active',
-      };
-
-      // Supprimer les champs undefined
-      Object.keys(firestoreData).forEach(key => {
-        if (firestoreData[key] === undefined) {
-          delete firestoreData[key];
-        }
-      });
-
-      const docRef = await addDoc(collection(db, POSTS_COLLECTION), firestoreData);
-      
-      // Retourner le post créé
-      return {
-        id: docRef.id,
-        ...firestoreData,
-        createdAt: firestoreData.createdAt.toDate(),
-      } as Post;
-    } catch (error) {
-      console.error('Erreur détaillée lors de la création du post:', error);
-      throw new Error('Impossible de créer le post: ' + error.message);
     }
   },
 
@@ -136,9 +184,8 @@ export const postService = {
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
-      })) as Post[];
+        ...doc.data()
+      } as Post));
     } catch (error) {
       console.error('Erreur lors de la récupération des posts de l\'utilisateur:', error);
       throw error;
@@ -158,9 +205,8 @@ export const postService = {
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
-      })) as Post[];
+        ...doc.data()
+      } as Post));
     } catch (error) {
       console.error('Erreur lors de la récupération des posts par catégorie:', error);
       throw error;
@@ -197,7 +243,8 @@ export const postService = {
       const userData = userDoc.data();
       const userRating = userData?.rating;
 
-      const responseRef = db.collection('posts').doc(postId).collection('responses').doc();
+      const postRef = doc(db, POSTS_COLLECTION, postId);
+      const responseRef = doc(collection(postRef, RESPONSES_COLLECTION), doc().id);
       await responseRef.set({
         ...responseData,
         userRating,
@@ -222,7 +269,7 @@ export const postService = {
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt.toDate().getTime() / 1000,
-      })) as PostResponse[];
+      } as PostResponse)).filter(Boolean);
     } catch (error) {
       console.error('Erreur lors de la récupération des réponses:', error);
       throw error;

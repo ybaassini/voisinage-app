@@ -7,6 +7,23 @@ export interface PostResponse {
   createdAt: number; // Timestamp Unix en secondes
 }
 
+export interface Location {
+  address: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  geohash?: string; // Ajout du geohash
+  // Ajout des champs pour geofire
+  g?: {
+    geohash: string;
+    geopoint: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+}
+
 export interface Post {
   id: string;
   type: 'request' | 'offer';
@@ -20,13 +37,8 @@ export interface Post {
     name: string;
     avatar: string;
   };
-  location: {
-    address: string;
-    coordinates?: {
-      latitude: number;
-      longitude: number;
-    };
-  };
+  location: Location;
+  distance: number;
   createdAt: number; // Timestamp Unix en secondes
   status: 'active' | 'completed' | 'cancelled';
 }

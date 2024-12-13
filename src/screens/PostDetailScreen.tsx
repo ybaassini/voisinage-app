@@ -27,15 +27,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import TimeAgo from '../components/TimeAgo';
 import { Post, PostResponse } from '../types/post';
 import { postService } from '../services/postService';
-import { useAuthContext } from '../contexts/AuthContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import { theme } from '../theme/theme';
+import { useAuth } from '../hooks/useAuth';
 
 const PostDetailScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute<any>();
-  const { user, userProfile } = useAuthContext();
+  const { user, userProfile } = useAuth();
   const requireAuth = useRequireAuth();
   const [post, setPost] = useState<Post | null>(route.params?.post || null);
   const [loading, setLoading] = useState(!route.params?.post);
