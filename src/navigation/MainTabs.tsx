@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
-import PostScreen from '../screens/PostScreen';
+import NewPostScreen from '../screens/newPostScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import ConversationsScreen from '../screens/ConversationsScreen';
 import ChatScreen from '../screens/ChatScreen';
@@ -59,7 +59,7 @@ const MainTabs = () => {
       />
       <Tab.Screen
         name="Post"
-        component={PostScreen}
+        component={NewPostScreen}
         options={{
           title: 'Publier',
           tabBarLabel: 'Publier',

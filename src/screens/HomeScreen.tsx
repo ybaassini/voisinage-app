@@ -7,8 +7,6 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import TimeAgo from '../components/TimeAgo';
 import { postService } from '../services/postService';
 import { Post } from '../types/post';
-import { CATEGORIES } from '../constants/categories';
-import PostBottomSheet from '../components/PostBottomSheet';
 import { useAuth } from '../hooks/useAuth';
 import { theme } from '../theme/theme';
 
@@ -62,15 +60,6 @@ const HomeScreen = ({ navigation }: any) => {
     }));
   }, []);
 
-  const navigateToChat = useCallback((item: Post) => {
-    navigation.navigate('Chat', { 
-      postId: item.id,
-      recipientName: item.requestor.name,
-      recipientAvatar: item.requestor.avatar,
-      recipientId: item.requestor.id,
-    });
-  }, [navigation]);
-
   const navigateToPostDetail = useCallback((post: Post) => {
     navigation.navigate('PostDetail', { post });
   }, [navigation]);
@@ -106,7 +95,7 @@ const HomeScreen = ({ navigation }: any) => {
                   size={14} 
                   color={theme.colors.onSurfaceVariant} 
                 />
-                <Text style={styles.distance}>{item.distance} km</Text>
+                <Text style={styles.distance}>{item.distance.toFixed(1)} km</Text>
               </View>
             ) : (
               <MaterialCommunityIcons 

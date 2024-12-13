@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { Text, useTheme, TextInput, Button, Menu, Divider } from 'react-native-paper';
+import { Text, useTheme, Menu, Divider } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -8,35 +8,47 @@ import { useRequireAuth } from '../hooks/useRequireAuth';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CATEGORIES, CATEGORY_GROUPS } from '../constants/categories';
 import { theme } from '../theme/theme';
+import { useForm } from 'react-hook-form';
+import { PostFormData } from '../types/forms';
+import { logger } from '../utils/logger';
+import CustomInput from '../components/forms/CustomInput';
+import CustomButton from '../components/forms/CustomButton';
 
-interface PostScreenProps {
+interface NewPostScreenProps {
   isBottomSheet?: boolean;
   onDismiss?: () => void;
 }
 
-const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
+const NewPostScreen = ({ isBottomSheet, onDismiss }: NewPostScreenProps) => {
   const theme = useTheme();
   const { user, userProfile } = useAuthContext();
-  const [type, setType] = useState<'request' | 'offer'>('request');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+
+  const form = useForm<PostFormData>({
+    defaultValues: {
+      title: '',
+      category: '',
+      description: '',
+      images: [],
+    },
+  });
 
   useRequireAuth();
 
   const handlePost = async () => {
     if (!user || !userProfile) return;
 
+    const formData = form.getValues();
+
     try {
       setLoading(true);
       await postService.createPost({
-        type,
-        title,
-        description,
-        category,
+        type: 'request',
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
         photos,
         requestor: {
           id: user.uid,
@@ -47,18 +59,12 @@ const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
         location: userProfile.location || { address: 'Non spécifié', coordinates: null },
       });
 
-      // Réinitialiser le formulaire
-      setType('request');
-      setTitle('');
-      setDescription('');
-      setCategory('');
+      form.reset();
       setPhotos([]);
-
-      if (onDismiss) {
-        onDismiss();
-      }
+      onDismiss?.();
     } catch (error) {
-      console.error('Error creating post:', error);
+      logger.error('Error creating post:', error);
+      alert('Une erreur est survenue lors de la création du post');
     } finally {
       setLoading(false);
     }
@@ -81,72 +87,7 @@ const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
     setPhotos(photos.filter((_, i) => i !== index));
   };
 
-  const selectedCategory = CATEGORIES.find(c => c.id === category);
-
-  const renderCategoryMenu = () => (
-    <Menu
-      visible={menuVisible}
-      onDismiss={() => setMenuVisible(false)}
-      anchor={
-        <TouchableOpacity
-          style={[
-            styles.categoryButton,
-            { 
-              borderColor: theme.colors.outline,
-              borderWidth: 0,
-              backgroundColor: theme.colors.surface,
-              borderRadius: 4,
-            }
-          ]}
-          onPress={() => setMenuVisible(true)}
-        >
-          <View style={styles.categoryButtonContent}>
-            {selectedCategory ? (
-              <>
-                <Icon name={selectedCategory.icon} size={20} color={theme.colors.primary} />
-                <Text style={[styles.categoryButtonText, { color: theme.colors.onSurface }]}>
-                  {selectedCategory.label}
-                </Text>
-              </>
-            ) : (
-              <Text style={[styles.categoryButtonText, { color: theme.colors.onSurfaceVariant }]}>
-                Sélectionner une catégorie
-              </Text>
-            )}
-            <Icon name="chevron-down" size={20} color={theme.colors.onSurfaceVariant} />
-          </View>
-        </TouchableOpacity>
-      }
-      style={styles.menu}
-    >
-      {Object.entries(CATEGORY_GROUPS).map(([groupName, categoryIds], groupIndex) => (
-        <React.Fragment key={groupName}>
-          {groupIndex > 0 && <Divider bold />}
-          <Menu.Item
-            title={groupName.replace('_', ' ')}
-            disabled
-            titleStyle={styles.menuGroupTitle}
-          />
-          {categoryIds.map(id => {
-            const categoryItem = CATEGORIES.find(c => c.id === id);
-            if (!categoryItem) return null;
-            
-            return (
-              <Menu.Item
-                key={id}
-                title={categoryItem.label}
-                leadingIcon={props => <Icon {...props} name={categoryItem.icon} />}
-                onPress={() => {
-                  setCategory(id);
-                  setMenuVisible(false);
-                }}
-              />
-            );
-          })}
-        </React.Fragment>
-      ))}
-    </Menu>
-  );
+  const selectedCategory = CATEGORIES.find(c => c.id === form.watch('category'));
 
   return (
     <ScrollView 
@@ -155,26 +96,87 @@ const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
     >
       <Text style={[styles.title]}>Nouvelle demande</Text>
 
-      <TextInput
-        mode="outlined"
+      <CustomInput
         label="Titre"
-        value={title}
-        onChangeText={setTitle}
+        value={form.watch('title')}
+        onChangeText={(value) => form.setValue('title', value)}
         style={[styles.input, { borderWidth: 0 }]}
+        leftIcon="format-title"
       />
 
-      <TextInput
-        mode="outlined"
+      <CustomInput
         label="Description"
-        value={description}
-        onChangeText={setDescription}
+        value={form.watch('description')}
+        onChangeText={(value) => form.setValue('description', value)}
         multiline
         numberOfLines={4}
         style={styles.input}
+        leftIcon="text"
       />
 
       <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Catégorie</Text>
-      {renderCategoryMenu()}
+      <Menu
+        visible={menuVisible}
+        onDismiss={() => setMenuVisible(false)}
+        anchor={
+          <TouchableOpacity
+            style={[
+              styles.categoryButton,
+              { 
+                borderColor: theme.colors.outline,
+                borderWidth: 0,
+                backgroundColor: theme.colors.surface,
+                borderRadius: 4,
+              }
+            ]}
+            onPress={() => setMenuVisible(true)}
+          >
+            <View style={styles.categoryButtonContent}>
+              {selectedCategory ? (
+                <>
+                  <Icon name={selectedCategory.icon} size={20} color={theme.colors.primary} />
+                  <Text style={[styles.categoryButtonText, { color: theme.colors.onSurface }]}>
+                    {selectedCategory.label}
+                  </Text>
+                </>
+              ) : (
+                <Text style={[styles.categoryButtonText, { color: theme.colors.onSurfaceVariant }]}>
+                  Sélectionner une catégorie
+                </Text>
+              )}
+              <Icon name="chevron-down" size={20} color={theme.colors.onSurfaceVariant} />
+            </View>
+          </TouchableOpacity>
+        }
+        style={styles.menu}
+      >
+        {Object.entries(CATEGORY_GROUPS).map(([groupName, categoryIds], groupIndex) => (
+          <React.Fragment key={groupName}>
+            {groupIndex > 0 && <Divider bold />}
+            <Menu.Item
+              title={groupName.replace('_', ' ')}
+              disabled
+              titleStyle={styles.menuGroupTitle}
+            />
+            {categoryIds.map(id => {
+              const categoryItem = CATEGORIES.find(c => c.id === id);
+              if (!categoryItem) return null;
+              
+              return (
+                <Menu.Item
+                  key={id}
+                  title={categoryItem.label}
+                  leadingIcon={props => <Icon {...props} name={categoryItem.icon} />}
+                  onPress={() => {
+                    form.setValue('category', id);
+                    setMenuVisible(false);
+                  }}
+                />
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </Menu>
 
       <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Photos</Text>
       <View style={styles.photoSection}>
@@ -199,15 +201,16 @@ const PostScreen = ({ isBottomSheet, onDismiss }: PostScreenProps) => {
         )}
       </View>
 
-      <Button
+      <CustomButton
         mode="contained"
         onPress={handlePost}
         loading={loading}
-        disabled={!title || !description || !category || loading}
+        disabled={!form.watch('title') || !form.watch('description') || !form.watch('category') || loading}
         style={styles.submitButton}
+        icon="send"
       >
         Publier
-      </Button>
+      </CustomButton>
     </ScrollView>
   );
 };
@@ -297,4 +300,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PostScreen;
+export default NewPostScreen;

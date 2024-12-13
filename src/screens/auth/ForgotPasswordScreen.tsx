@@ -6,8 +6,8 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
-import CustomInput from '../../components/CustomInput';
-import CustomButton from '../../components/CustomButton';
+import CustomInput from '../../components/forms/CustomInput';
+import CustomButton from '../../components/forms/CustomButton';
 import { theme } from '../../theme/theme';
 
 const validationSchema = Yup.object().shape({

@@ -81,15 +81,7 @@ export const useAuth = () => {
             
             // Récupérer ou créer le profil utilisateur
             let userProfile = await userService.getUserProfile(user.uid);
-            
-            if (!userProfile) {
-              console.log('Création d\'un nouveau profil pour:', user.uid);
-              userProfile = await createInitialProfile(user);
-            } else {
-              // Mettre à jour la dernière connexion silencieusement
-              userService.updateUserProfile(user.uid, {})
-                .catch(err => console.error('Erreur lors de la mise à jour de lastLoginAt:', err));
-            }
+
 
             setAuthState({
               user,

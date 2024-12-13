@@ -6,15 +6,14 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Platform, View, StyleSheet, Text } from 'react-native';
 
 import HomeScreen from '../screens/HomeScreen';
-import PostScreen from '../screens/PostScreen';
+import NewPostScreen from '../screens/newPostScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import Logo from '../components/Logo';
 import ConversationsScreen from '../screens/ConversationsScreen';
-import PostBottomSheet from '../components/PostBottomSheet';
-import { theme } from '../theme/theme';
+import BottomSheet from '../components/BottomSheet';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -214,11 +213,11 @@ const MainTabs = () => {
         />
 
       </Tab.Navigator>
-      {/* Render PostBottomSheet outside of Tab.Navigator but inside the fragment */}
-      <PostBottomSheet 
+      {/* Render BottomSheet outside of Tab.Navigator but inside the fragment */}
+      <BottomSheet 
         visible={isPostSheetVisible} 
         onDismiss={() => {
-          console.log('PostBottomSheet onDismiss called');
+          console.log('BottomSheet onDismiss called');
           setIsPostSheetVisible(false);
         }} 
       />

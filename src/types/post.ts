@@ -1,46 +1,103 @@
-export interface PostResponse {
+import { Timestamp } from 'firebase/firestore';
+import { Location } from './location';
+import { PostResponse } from './responses';
+
+/**
+ * Types de post disponibles
+ */
+export type PostType = 'request' | 'offer';
+
+/**
+ * Statuts possibles d'un post
+ */
+export type PostStatus = 'active' | 'completed' | 'cancelled';
+
+/**
+ * Interface pour les informations de l'auteur d'un post
+ * @interface PostAuthor
+ */
+export interface PostAuthor {
+  /** Identifiant de l'auteur */
   id: string;
-  userId: string;
-  userName: string;
-  userAvatar: string;
-  userRating?: number; // Note moyenne de l'utilisateur
-  createdAt: number; // Timestamp Unix en secondes
+  
+  /** Nom de l'auteur */
+  name: string;
+  
+  /** URL de l'avatar de l'auteur */
+  avatar: string;
+  
+  /** Note moyenne de l'auteur (optionnel) */
+  rating?: number;
 }
 
-export interface Location {
-  address: string;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
-  } | null;
-  geohash?: string; // Ajout du geohash
-  // Ajout des champs pour geofire
-  g?: {
-    geohash: string;
-    geopoint: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-}
-
+/**
+ * Interface principale pour un post
+ * @interface Post
+ */
 export interface Post {
+  /** Identifiant unique du post */
   id: string;
-  type: 'request' | 'offer';
+  
+  /** Type de post (demande ou offre) */
+  type: PostType;
+  
+  /** Titre du post */
   title: string;
+  
+  /** Description détaillée */
   description: string;
+  
+  /** Catégorie du post */
   category: string;
+  
+  /** URLs des photos associées (optionnel) */
   photos?: string[];
+  
+  /** Liste des IDs des utilisateurs ayant liké (optionnel) */
   likes?: string[];
-  requestor: {
-    id: string;
-    name: string;
-    avatar: string;
-  };
+  
+  /** Informations sur l'auteur */
+  requestor: PostAuthor;
+  
+  /** Localisation du post */
   location: Location;
+  
+  /** Distance par rapport à l'utilisateur (en km) */
   distance: number;
-  createdAt: number; // Timestamp Unix en secondes
-  status: 'active' | 'completed' | 'cancelled';
+  
+  /** Date de création */
+  createdAt: Timestamp | number;
+  
+  /** Statut actuel du post */
+  status: PostStatus;
+  
+  /** Réponses au post (optionnel) */
+  responses?: PostResponse[];
 }
 
-export type CreatePostData = Omit<Post, 'id' | 'createdAt' | 'likes'>;
+/**
+ * Interface pour la création d'un nouveau post
+ * @interface CreatePostData
+ */
+export interface CreatePostData {
+  /** Type de post */
+  type: PostType;
+  
+  /** Titre du post */
+  title: string;
+  
+  /** Description détaillée */
+  description: string;
+  
+  /** Catégorie du post */
+  category: string;
+  
+  /** Fichiers photos à uploader (optionnel) */
+  photos?: File[];
+  
+  /** Informations sur l'auteur */
+  requestor: PostAuthor;
+  
+  /** Localisation du post */
+  location: Location;
+}

@@ -7,8 +7,8 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useAppDispatch, useAppSelector } from '../../store/store';
 import { registerUser } from '../../store/slices/authSlice';
-import CustomInput from '../../components/CustomInput';
-import CustomButton from '../../components/CustomButton';
+import CustomInput from '../../components/forms/CustomInput';
+import CustomButton from '../../components/forms/CustomButton';
 import { theme } from '../../theme/theme';
 
 const validationSchema = Yup.object().shape({

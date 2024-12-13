@@ -25,11 +25,12 @@ import Animated, {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import TimeAgo from '../components/TimeAgo';
-import { Post, PostResponse } from '../types/post';
+import { Post } from '../types/post';
 import { postService } from '../services/postService';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import { theme } from '../theme/theme';
 import { useAuth } from '../hooks/useAuth';
+import { PostResponse } from '../types/responses';
 
 const PostDetailScreen = () => {
   const theme = useTheme();
@@ -104,42 +105,6 @@ const PostDetailScreen = () => {
       scrollY.value = event.contentOffset.y;
     },
   });
-
-  const headerStyle = useAnimatedStyle(() => {
-    return {
-      height: interpolate(scrollY.value, [0, 100], [250, 150], 'clamp'),
-      opacity: interpolate(scrollY.value, [0, 100], [1, 0.8], 'clamp'),
-    };
-  });
-
-  const handleContactPress = () => {
-    navigation.navigate('Chat', { 
-      postId: post?.id,
-      recipientId: post?.requestor.id,
-      recipientName: post?.requestor.name,
-      recipientAvatar: post?.requestor.avatar
-    });
-  };
-
-  const handleLocationPress = () => {
-    if (post?.location.coordinates) {
-      const { latitude, longitude } = post.location.coordinates;
-      const url = Platform.select({
-        ios: `maps://app?saddr=Current%20Location&daddr=${latitude},${longitude}`,
-        android: `geo:${latitude},${longitude}?q=${latitude},${longitude}`,
-      });
-      
-      Linking.canOpenURL(url!).then(supported => {
-        if (supported) {
-          Linking.openURL(url!);
-        } else {
-          Linking.openURL(
-            `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
-          );
-        }
-      });
-    }
-  };
 
   const handleReply = async () => {
     requireAuth(async () => {
@@ -325,13 +290,13 @@ const PostDetailScreen = () => {
             </Chip>
 
             {post.location.address && (
-              <TouchableOpacity onPress={handleLocationPress}>
+              <TouchableOpacity>
                 <Chip
                   icon="map-marker"
                   mode="flat"
                   style={[styles.locationChip, { backgroundColor: theme.colors.background }]}
                 >
-                  {post.location.address}
+                  {`${post.distance.toFixed(1)} km`}
                 </Chip>
               </TouchableOpacity>
             )}

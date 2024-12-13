@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Text, Avatar, Button, Surface, useTheme, TextInput, Chip, IconButton } from 'react-native-paper';
+import { Text, Avatar, Button, Surface, useTheme, Chip, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,6 +10,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { auth } from '../config/firebase';
 import { signOut } from 'firebase/auth';
 import { useUserContext } from '../contexts/UserContext';
+import CustomInput from '../components/forms/CustomInput';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -216,7 +217,7 @@ const ProfileScreen = () => {
           </View>
           
           {isEditing ? (
-            <TextInput
+            <CustomInput
               mode="outlined"
               value={`${userProfile.firstName} ${userProfile.lastName}`}
               onChangeText={(text) => {
@@ -224,6 +225,7 @@ const ProfileScreen = () => {
                 updateProfile({ firstName, lastName });
               }}
               style={styles.nameInput}
+              leftIcon="account"
             />
           ) : (
             <Text variant="headlineSmall" style={styles.name}>
@@ -239,7 +241,7 @@ const ProfileScreen = () => {
                 color={theme.colors.primary}
               />
               {isEditing ? (
-                <TextInput
+                <CustomInput
                   mode="flat"
                   value={userProfile.location.address}
                   onChangeText={(text) => 
@@ -248,6 +250,7 @@ const ProfileScreen = () => {
                     })
                   }
                   style={styles.cityInput}
+                  leftIcon="map-marker"
                 />
               ) : (
                 <Text style={styles.city}>{userProfile.location.address}</Text>
@@ -273,7 +276,7 @@ const ProfileScreen = () => {
 
         {renderSection('À propos',
           isEditing ? (
-            <TextInput
+            <CustomInput
               mode="outlined"
               value={userProfile.bio}
               onChangeText={(text) => 
@@ -282,6 +285,7 @@ const ProfileScreen = () => {
               multiline
               numberOfLines={4}
               style={styles.bioInput}
+              leftIcon="text-box"
             />
           ) : (
             <Text style={styles.bio}>{userProfile.bio}</Text>
@@ -313,12 +317,13 @@ const ProfileScreen = () => {
             </View>
             {showSkillInput && (
               <View style={styles.addSkillContainer}>
-                <TextInput
+                <CustomInput
                   mode="outlined"
                   value={newSkill}
                   onChangeText={setNewSkill}
                   placeholder="Nouvelle compétence"
                   style={styles.skillInput}
+                  leftIcon="tag"
                 />
                 <Button onPress={handleAddSkill}>Ajouter</Button>
               </View>

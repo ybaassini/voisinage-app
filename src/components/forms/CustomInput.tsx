@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { theme } from '../../theme/theme';
 
 interface CustomInputProps {
   label: string;
@@ -62,9 +63,13 @@ const CustomInput = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
+    borderWidth: 0,
   },
   input: {
-    backgroundColor: 'transparent',
+    backgroundColor: theme.colors.surfaceVariant,
+    borderRadius: 8,
+    borderWidth: 0,
+    borderColor: theme.colors.outline,
   },
   errorText: {
     color: '#B00020',

@@ -1,17 +1,17 @@
 import React from 'react';
 import { View, StyleSheet, Modal, Dimensions, Pressable } from 'react-native';
 import { useTheme } from 'react-native-paper';
-import PostScreen from '../screens/PostScreen';
+import NewPostScreen from '../screens/newPostScreen';
 import { theme } from '../theme/theme';
 
-interface PostBottomSheetProps {
+interface BottomSheetProps {
   visible: boolean;
   onDismiss: () => void;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const PostBottomSheet = ({ visible, onDismiss }: PostBottomSheetProps) => {
+const BottomSheet = ({ visible, onDismiss }: BottomSheetProps) => {
   const theme = useTheme();
 
   return (
@@ -25,7 +25,7 @@ const PostBottomSheet = ({ visible, onDismiss }: PostBottomSheetProps) => {
         <Pressable style={styles.backdrop} onPress={onDismiss} />
         <View style={[styles.contentContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.handle, { backgroundColor: theme.colors.onSurfaceVariant }]} />
-          <PostScreen isBottomSheet onDismiss={onDismiss} />
+          <NewPostScreen isBottomSheet onDismiss={onDismiss} />
         </View>
       </View>
     </Modal>
@@ -66,4 +66,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PostBottomSheet;
+export default BottomSheet;

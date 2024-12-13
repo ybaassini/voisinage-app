@@ -22,7 +22,7 @@ export const userService = {
         },
         skills: data.skills || [],
         portfolio: data.portfolio || [],
-        avatar: data.avatar || null,
+        avatar: data.avatar || '',
         createdAt: Timestamp.fromDate(now),
         lastLoginAt: Timestamp.fromDate(now),
       };
