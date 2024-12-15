@@ -6,7 +6,6 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Platform, View, StyleSheet, Text } from 'react-native';
 
 import HomeScreen from '../screens/HomeScreen';
-import NewPostScreen from '../screens/newPostScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import ChatScreen from '../screens/ChatScreen';

@@ -7,15 +7,19 @@ import {
   User
 } from 'firebase/auth';
 import { auth } from '../../config/firebase';
+import { userService } from '../../services/userService';
+import { UserProfile } from '../../types/user';
 
 interface AuthState {
   user: User | null;
+  userProfile: UserProfile | null;
   loading: boolean;
   error: string | null;
 }
 
 const initialState: AuthState = {
   user: null,
+  userProfile: null,
   loading: false,
   error: null,
 };
@@ -40,7 +44,17 @@ export const loginUser = createAsyncThunk(
       console.log('Tentative de connexion avec:', email);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log('Connexion réussie:', userCredential.user);
-      return userCredential.user;
+      
+      // Récupérer le profil utilisateur
+      const userProfile = await userService.getUserProfile(userCredential.user.uid);
+      if (!userProfile) {
+        throw new Error('Profil utilisateur non trouvé');
+      }
+      
+      return {
+        user: userCredential.user,
+        userProfile
+      };
     } catch (error: any) {
       console.error('Erreur de connexion:', error);
       console.error('Code d\'erreur:', error.code);
@@ -94,7 +108,8 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload;
+        state.user = action.payload.user;
+        state.userProfile = action.payload.userProfile;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -108,6 +123,7 @@ const authSlice = createSlice({
       .addCase(logoutUser.fulfilled, (state) => {
         state.loading = false;
         state.user = null;
+        state.userProfile = null;
         state.error = null;
       })
       .addCase(logoutUser.rejected, (state, action) => {

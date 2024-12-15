@@ -4,6 +4,13 @@ import { Provider as ReduxProvider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { 
+  useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold
+} from '@expo-google-fonts/poppins';
 import { store } from './src/store/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import { theme } from './src/theme/theme';
@@ -13,6 +20,17 @@ import { ChatProvider } from './src/contexts/ChatContext';
 import { NotificationProvider } from './src/contexts/NotificationContext';
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ReduxProvider store={store}>

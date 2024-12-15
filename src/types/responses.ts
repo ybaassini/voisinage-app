@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { UserProfile } from './user';
 
 /**
  * Interface représentant la réponse à un post
@@ -8,23 +9,23 @@ export interface PostResponse {
   /** Identifiant unique de la réponse */
   id: string;
   
-  /** Identifiant de l'utilisateur qui a répondu */
-  userId: string;
-  
-  /** Nom de l'utilisateur qui a répondu */
-  userName: string;
-  
-  /** URL de l'avatar de l'utilisateur */
-  userAvatar: string;
-  
-  /** Note moyenne de l'utilisateur (optionnel) */
-  userRating?: number;
-  
+  /** l'utilisateur qui a répondu */
+  responser: UserProfile;
+
+  /** demandeur */
+  requestor: UserProfile;
+
   /** Timestamp de création de la réponse */
   createdAt: Timestamp | number;
   
   /** Contenu de la réponse */
   content: string;
+
+  /** Statut de la réponse */
+  status?: 'pending' | 'accepted' | 'rejected';
+
+  /** Note donnée à la réponse */
+  rating?: number;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 import { Location } from './location';
 import { PostResponse } from './responses';
+import { UserProfile } from './user';
 
 /**
  * Types de post disponibles
@@ -11,24 +12,6 @@ export type PostType = 'request' | 'offer';
  * Statuts possibles d'un post
  */
 export type PostStatus = 'active' | 'completed' | 'cancelled';
-
-/**
- * Interface pour les informations de l'auteur d'un post
- * @interface PostAuthor
- */
-export interface PostAuthor {
-  /** Identifiant de l'auteur */
-  id: string;
-  
-  /** Nom de l'auteur */
-  name: string;
-  
-  /** URL de l'avatar de l'auteur */
-  avatar: string;
-  
-  /** Note moyenne de l'auteur (optionnel) */
-  rating?: number;
-}
 
 /**
  * Interface principale pour un post
@@ -56,8 +39,8 @@ export interface Post {
   /** Liste des IDs des utilisateurs ayant liké (optionnel) */
   likes?: string[];
   
-  /** Informations sur l'auteur */
-  requestor: PostAuthor;
+  /** Auteur du post */
+  requestor: UserProfile;
   
   /** Localisation du post */
   location: Location;
@@ -95,8 +78,8 @@ export interface CreatePostData {
   /** Fichiers photos à uploader (optionnel) */
   photos?: File[];
   
-  /** Informations sur l'auteur */
-  requestor: PostAuthor;
+  /** Auteur du post */
+  requestor: UserProfile;
   
   /** Localisation du post */
   location: Location;

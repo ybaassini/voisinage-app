@@ -135,9 +135,9 @@ export const postService = {
 
           if (distance <= radiusInKm) {
             posts.push({
+              ...postData,
               id: doc.id,
-              distance,
-              ...postData
+              distance
             } as Post);
             processedCount++;
           }

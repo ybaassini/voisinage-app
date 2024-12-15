@@ -70,7 +70,7 @@ const HomeScreen = ({ navigation }: any) => {
         navigation.navigate('Chat', {
           postId: post.id,
           recipientId: post.requestor.id,
-          recipientName: post.requestor.name,
+          recipientName: `${post.requestor.firstName} ${post.requestor.lastName}`, // post.requestor.,
           recipientAvatar: post.requestor.avatar
         });
       } catch (error) {
@@ -81,12 +81,14 @@ const HomeScreen = ({ navigation }: any) => {
   const renderPostHeader = useCallback(({ item }: { item: Post }) => (
     <View style={styles.cardHeader}>
       <View style={styles.userInfo}>
-        <Avatar.Image 
-          size={40} 
-          source={{ uri: item.requestor.avatar }} 
-        />
+        <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.requestor.id })}>
+          <Avatar.Image 
+            size={40} 
+            source={{ uri: item.requestor.avatar }} 
+          />
+        </TouchableOpacity>
         <View style={styles.userInfoText}>
-          <Text variant="titleMedium">{item.requestor.name}</Text>
+          <Text variant="titleMedium">{`${item.requestor.firstName} ${item.requestor.lastName}`}</Text>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
             {item.distance !== undefined ? (
               <View style={styles.distanceContainer}>
@@ -109,7 +111,7 @@ const HomeScreen = ({ navigation }: any) => {
       </View>
       <TimeAgo date={item.createdAt} style={{ color: theme.colors.onSurfaceVariant }} />
     </View>
-  ), [theme.colors.onSurfaceVariant]);
+  ), [theme.colors.onSurfaceVariant, navigation]);
 
   const renderPostActions = useCallback(({ item }: { item: Post }) => (
     <Card.Actions style={styles.actionBanner}>

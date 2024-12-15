@@ -1,377 +1,383 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Text, Avatar, Button, Surface, useTheme, Chip, IconButton } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { Text, Avatar, useTheme, Button, Surface, Chip, IconButton, Image } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import * as ImagePicker from 'expo-image-picker';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../hooks/useAuth';
+import { userService } from '../services/userService';
+import { UserProfile } from '../types/user';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { auth } from '../config/firebase';
-import { signOut } from 'firebase/auth';
-import { useUserContext } from '../contexts/UserContext';
-import CustomInput from '../components/forms/CustomInput';
+import { formatDistanceToNow } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { theme } from '../theme/theme';
 
-type RootStackParamList = {
-  Auth: undefined;
-  Main: undefined;
-};
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type TabType = 'accueil' | 'photos' | 'avis';
 
 const ProfileScreen = () => {
   const theme = useTheme();
-  const navigation = useNavigation<ProfileScreenNavigationProp>();
-  const { 
-    userProfile,
-    loading,
-    error,
-    updateProfile,
-    updateAvatar,
-    addSkill,
-    removeSkill,
-    addPortfolioItem,
-    removePortfolioItem,
-    refreshProfile
-  } = useUserContext();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { userProfile: currentUserProfile } = useAuth();
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('accueil');
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [newSkill, setNewSkill] = useState('');
-  const [showSkillInput, setShowSkillInput] = useState(false);
-
-  // Log du contexte utilisateur
-  useEffect(() => {
-    console.log('UserContext State:', {
-      userProfile,
-      loading,
-      error,
-      isEditing
-    });
-  }, [userProfile, loading, error, isEditing]);
-
-  // Rafraîchir le profil au montage du composant
-  useEffect(() => {
-    refreshProfile();
-  }, []);
+  // Récupérer l'userId des paramètres de route s'il existe
+  const userId = route.params?.userId;
+  const isCurrentUser = !userId || (currentUserProfile && userId === currentUserProfile.id);
 
   useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <IconButton
-          icon={isEditing ? "check" : "pencil"}
-          mode="contained"
-          onPress={handleEditToggle}
-          style={{ marginRight: 8 }}
-        />
-      ),
-    });
-  }, [isEditing, navigation]);
-
-  const handleEditToggle = async () => {
-    if (isEditing && userProfile) {
+    const loadProfile = async () => {
       try {
-        await updateProfile({
-          firstName: userProfile.firstName,
-          lastName: userProfile.lastName,
-          bio: userProfile.bio,
-          location: userProfile.location,
-        });
-        Alert.alert('Succès', 'Profil mis à jour avec succès');
-      } catch (err) {
-        Alert.alert('Erreur', 'Impossible de mettre à jour le profil. Veuillez réessayer.');
-      }
-    }
-    setIsEditing(!isEditing);
-  };
+        setLoading(true);
+        setError(null);
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnexion',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut(auth);
-              navigation.replace('Auth');
-            } catch (error) {
-              Alert.alert(
-                'Erreur',
-                'Une erreur est survenue lors de la déconnexion. Veuillez réessayer.',
-                [{ text: 'OK' }]
-              );
-            }
-          }
-        },
-      ]
-    );
-  };
+        let profile: UserProfile | null;
 
-  const pickImage = async (isAvatar = false) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: isAvatar ? [1, 1] : [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      try {
-        const imageUri = result.assets[0].uri;
-        if (isAvatar) {
-          await updateAvatar(imageUri);
+        if (isCurrentUser) {
+          profile = currentUserProfile;
         } else {
-          await addPortfolioItem(imageUri, '');
+          profile = await userService.getUserProfile(userId);
         }
-      } catch (err) {
-        Alert.alert('Erreur', 'Impossible de mettre à jour l\'image. Veuillez réessayer.');
+
+        if (!profile) {
+          throw new Error('Profil non trouvé');
+        }
+
+        setProfileData(profile);
+      } catch (error) {
+        console.error('Erreur lors du chargement du profil:', error);
+        setError('Impossible de charger le profil');
+      } finally {
+        setLoading(false);
       }
-    }
-  };
+    };
 
-  const handleAddSkill = async () => {
-    if (!newSkill.trim()) return;
-
-    try {
-      await addSkill(newSkill.trim(), 1);
-      setNewSkill('');
-      setShowSkillInput(false);
-    } catch (err) {
-      Alert.alert('Erreur', 'Impossible d\'ajouter la compétence. Veuillez réessayer.');
-    }
-  };
-
-  const handleRemoveSkill = async (skillName: string) => {
-    try {
-      await removeSkill(skillName);
-    } catch (err) {
-      Alert.alert('Erreur', 'Impossible de supprimer la compétence. Veuillez réessayer.');
-    }
-  };
+    loadProfile();
+  }, [userId, currentUserProfile, isCurrentUser]);
 
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text>Chargement...</Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error || !profileData) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
-          {error}
-        </Text>
-        <Button mode="contained" onPress={refreshProfile}>
-          Réessayer
+        <Text style={styles.errorText}>{error || 'Profil non trouvé'}</Text>
+        <Button mode="contained" onPress={() => navigation.goBack()}>
+          Retour
         </Button>
       </View>
     );
   }
 
-  if (!userProfile) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
-          Profil non trouvé
-        </Text>
-        <Button mode="contained" onPress={() => navigation.replace('Auth')}>
-          Se connecter
-        </Button>
-      </View>
-    );
-  }
+  const memberSince = formatDistanceToNow(
+    new Date(profileData.createdAt),
+    { addSuffix: true, locale: fr }
+  );
 
-  const renderSection = (title: string, children: React.ReactNode) => (
+  const renderHeader = () => (
     <Animated.View
-      entering={FadeInDown.springify()}
-      style={[styles.section, { backgroundColor: theme.colors.surface }]}
+      entering={FadeInDown.duration(1000).springify()}
+      style={styles.header}
     >
-      <Text variant="titleMedium" style={styles.sectionTitle}>{title}</Text>
-      {children}
+      <Surface style={[styles.profileCard]} elevation={1}>
+        <View style={styles.avatarContainer}>
+          <Avatar.Image
+            size={120}
+            source={{ uri: profileData.avatar }}
+            style={styles.avatar}
+          />
+          {isCurrentUser && (
+            <IconButton
+              icon="pencil"
+              size={20}
+              style={styles.editAvatarButton}
+              onPress={() => {/* TODO: Implémenter la modification de l'avatar */ }}
+            />
+          )}
+        </View>
+
+        <View style={styles.userInfo}>
+          <Text variant="headlineSmall" style={styles.name}>
+            {`${profileData.firstName} ${profileData.lastName}`}
+          </Text>
+
+          <View style={styles.ratingContainer}>
+            <MaterialCommunityIcons
+              name="star"
+              size={20}
+              color={theme.colors.primary}
+            />
+            <Text style={[styles.rating, { color: theme.colors.primary }]}>
+              {profileData.rating.average.toFixed(1)} ({profileData.rating.count} avis)
+            </Text>
+          </View>
+
+          <Text style={[styles.memberSince, { color: theme.colors.onSurfaceVariant }]}>
+            Membre {memberSince}
+          </Text>
+
+          {!isCurrentUser && (
+            <Button
+              mode="contained"
+              icon="message"
+              style={styles.messageButton}
+              onPress={() => navigation.navigate('Chat', {
+                recipientId: profileData.id,
+                recipientName: `${profileData.firstName} ${profileData.lastName}`,
+                recipientAvatar: profileData.avatar
+              })}
+            >
+              Envoyer un message
+            </Button>
+          )}
+        </View>
+      </Surface>
     </Animated.View>
   );
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView style={styles.scrollView}>
-        <Surface style={[styles.profileHeader, { backgroundColor: theme.colors.background }]}>
-          <View style={styles.avatarContainer}>
-            <Avatar.Image
-              size={100}
-              source={{ uri: userProfile.avatar || 'https://via.placeholder.com/150' }}
-            />
-            {isEditing && (
-              <IconButton
-                icon="camera"
-                mode="contained"
-                size={20}
-                onPress={() => pickImage(true)}
-                style={styles.editAvatarButton}
-              />
-            )}
-          </View>
-          
-          {isEditing ? (
-            <CustomInput
-              mode="outlined"
-              value={`${userProfile.firstName} ${userProfile.lastName}`}
-              onChangeText={(text) => {
-                const [firstName = '', lastName = ''] = text.split(' ');
-                updateProfile({ firstName, lastName });
-              }}
-              style={styles.nameInput}
-              leftIcon="account"
-            />
-          ) : (
-            <Text variant="headlineSmall" style={styles.name}>
-              {`${userProfile.firstName} ${userProfile.lastName}`}
-            </Text>
-          )}
+  const renderTabs = () => (
+    <Surface style={[styles.tabsContainer, { backgroundColor: theme.colors.surface }]} elevation={1}>
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'accueil' && styles.activeTab,
+          { borderBottomColor: theme.colors.primary }
+        ]}
+        onPress={() => setActiveTab('accueil')}
+      >
+        <Text style={[
+          styles.tabText,
+          { color: activeTab === 'accueil' ? theme.colors.primary : theme.colors.onSurfaceVariant }
+        ]}>
+          Accueil
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'photos' && styles.activeTab,
+          { borderBottomColor: theme.colors.primary }
+        ]}
+        onPress={() => setActiveTab('photos')}
+      >
+        <Text style={[
+          styles.tabText,
+          { color: activeTab === 'photos' ? theme.colors.primary : theme.colors.onSurfaceVariant }
+        ]}>
+          Photos
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'avis' && styles.activeTab,
+          { borderBottomColor: theme.colors.primary }
+        ]}
+        onPress={() => setActiveTab('avis')}
+      >
+        <Text style={[
+          styles.tabText,
+          { color: activeTab === 'avis' ? theme.colors.primary : theme.colors.onSurfaceVariant }
+        ]}>
+          Avis
+        </Text>
+      </TouchableOpacity>
+    </Surface>
+  );
 
-          <View style={styles.locationRatingContainer}>
-            <View style={styles.locationContainer}>
-              <MaterialCommunityIcons 
-                name="map-marker" 
-                size={16} 
-                color={theme.colors.primary}
-              />
-              {isEditing ? (
-                <CustomInput
-                  mode="flat"
-                  value={userProfile.location.address}
-                  onChangeText={(text) => 
-                    updateProfile({ 
-                      location: { ...userProfile.location, address: text } 
-                    })
-                  }
-                  style={styles.cityInput}
-                  leftIcon="map-marker"
-                />
-              ) : (
-                <Text style={styles.city}>{userProfile.location.address}</Text>
-              )}
-            </View>
-            <View style={styles.ratingContainer}>
-              <View style={styles.starsContainer}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <MaterialCommunityIcons
-                    key={star}
-                    name={star <= Math.floor(userProfile.rating.average) ? 'star' : 'star-outline'}
-                    size={16}
-                    color={theme.colors.primary}
-                  />
-                ))}
-              </View>
-              <Text style={styles.ratingText}>
-                {userProfile.rating.average.toFixed(1)} ({userProfile.rating.count} avis)
+  const renderAccueilContent = () => (
+    <>
+      <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
+        <Surface style={[styles.sectionCard]} elevation={1}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account" size={24} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={styles.sectionTitle}>À propos</Text>
+          </View>
+          <Text style={styles.bio}>{profileData.bio || 'Aucune bio renseignée'}</Text>
+        </Surface>
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(300)} style={styles.section}>
+        <Surface style={[styles.sectionCard]} elevation={1}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="lightbulb" size={24} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={styles.sectionTitle}>Compétences</Text>
+          </View>
+          <View style={styles.skillsContainer}>
+            {profileData.skills && profileData.skills.length > 0 ? (
+              profileData.skills.map((skill, index) => (
+                <Chip
+                icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
+                mode="flat"
+                style={[styles.categoryChip, { 
+                  backgroundColor: theme.colors.background,
+                  color: theme.colors.secondary 
+                }]}
+              >
+                {skill.name}
+              </Chip>
+              ))
+            ) : (
+              <Text style={{ color: theme.colors.onSurfaceVariant }}>
+                Aucune compétence renseignée
               </Text>
-            </View>
+            )}
           </View>
         </Surface>
+      </Animated.View>
 
-        {renderSection('À propos',
-          isEditing ? (
-            <CustomInput
-              mode="outlined"
-              value={userProfile.bio}
-              onChangeText={(text) => 
-                updateProfile({ bio: text })
-              }
-              multiline
-              numberOfLines={4}
-              style={styles.bioInput}
-              leftIcon="text-box"
-            />
-          ) : (
-            <Text style={styles.bio}>{userProfile.bio}</Text>
-          )
-        )}
-
-        {renderSection('Compétences',
-          <View>
-            <View style={styles.skillsContainer}>
-              {userProfile.skills.map((skill, index) => (
-                <Chip
-                  key={index}
-                  onClose={isEditing ? () => handleRemoveSkill(skill.name) : undefined}
-                  style={styles.skillChip}
-                  textStyle={{ color: theme.colors.onSurface }}
-                >
-                  {skill.name}
-                </Chip>
-              ))}
-              {isEditing && !showSkillInput && (
-                <Button
-                  mode="outlined"
-                  icon="plus"
-                  onPress={() => setShowSkillInput(true)}
-                >
-                  Ajouter
-                </Button>
-              )}
-            </View>
-            {showSkillInput && (
-              <View style={styles.addSkillContainer}>
-                <CustomInput
-                  mode="outlined"
-                  value={newSkill}
-                  onChangeText={setNewSkill}
-                  placeholder="Nouvelle compétence"
-                  style={styles.skillInput}
-                  leftIcon="tag"
-                />
-                <Button onPress={handleAddSkill}>Ajouter</Button>
-              </View>
-            )}
+      <Animated.View entering={FadeInDown.delay(400)} style={styles.section}>
+        <Surface style={[styles.sectionCard]} elevation={1}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="map-marker" size={24} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={styles.sectionTitle}>Localisation</Text>
           </View>
-        )}
+          <Text style={styles.location}>{profileData.location.address}</Text>
+        </Surface>
+      </Animated.View>
+    </>
+  );
 
-        {renderSection('Photos de mes réalisations',
-          <View>
-            <View style={styles.photosGrid}>
-              {userProfile.portfolio.map((item, index) => (
-                <View key={index} style={styles.photoContainer}>
-                  <Image source={{ uri: item.imageUrl }} style={styles.photo} />
-                  {isEditing && (
-                    <IconButton
-                      icon="close"
-                      mode="contained"
-                      size={20}
-                      onPress={() => removePortfolioItem(item.id)}
-                      style={styles.removePhotoButton}
+  const renderPhotosContent = () => (
+    <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
+      <Surface style={[styles.sectionCard]} elevation={1}>
+        <View style={styles.sectionHeader}>
+          <MaterialCommunityIcons name="image-multiple" size={24} color={theme.colors.primary} />
+          <Text variant="titleMedium" style={styles.sectionTitle}>Portfolio</Text>
+        </View>
+        <View style={styles.photosGrid}>
+          {profileData.portfolio && profileData.portfolio.length > 0 ? (
+            profileData.portfolio.map((photo, index) => (
+              <View key={index} style={styles.photoContainer}>
+                <Image
+                  source={{ uri: photo.url }}
+                  style={styles.photo}
+                  resizeMode="cover"
+                />
+              </View>
+            ))
+          ) : (
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>
+              Aucune photo dans le portfolio
+            </Text>
+          )}
+        </View>
+      </Surface>
+    </Animated.View>
+  );
+
+  const renderAvisContent = () => {
+    const ratings = [
+      { rating: 5, percentage: 98 },
+      { rating: 4, percentage: 2 },
+      { rating: 3, percentage: 0 },
+      { rating: 2, percentage: 0 },
+      { rating: 1, percentage: 0 },
+    ];
+
+    return (
+      <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
+        <Surface style={[styles.sectionCard]} elevation={1}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="star" size={24} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={styles.sectionTitle}>Avis</Text>
+          </View>
+          <View style={styles.reviewsContainer}>
+            <View style={styles.ratingOverview}>
+              <View style={styles.ratingStarContainer}>
+                <MaterialCommunityIcons name="star" size={32} color="#F4B95F" />
+                <Text style={styles.ratingValue}>{profileData.rating.average.toFixed(1)}/5</Text>
+              </View>
+              <Text style={styles.ratingCount}>
+                Basé sur {profileData.rating.count} avis
+              </Text>
+            </View>
+
+            <View style={styles.ratingBars}>
+              {ratings.map((item) => (
+                <View key={item.rating} style={styles.ratingBarRow}>
+                  <Text style={styles.ratingNumber}>{item.rating}</Text>
+                  <View style={styles.barContainer}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        {
+                          width: `${item.percentage}%`,
+                          backgroundColor: item.percentage > 0 ? '#F4B95F' : '#F5F5F5'
+                        }
+                      ]}
                     />
-                  )}
+                  </View>
+                  <Text style={styles.percentageText}>
+                    {item.percentage > 0 ? `${item.percentage}%` : '-'}
+                  </Text>
                 </View>
               ))}
-              {isEditing && (
-                <TouchableOpacity
-                  style={[styles.addPhotoButton, { borderColor: theme.colors.primary }]}
-                  onPress={() => pickImage(false)}
-                >
-                  <MaterialCommunityIcons
-                    name="plus"
-                    size={32}
-                    color={theme.colors.primary}
-                  />
-                </TouchableOpacity>
-              )}
             </View>
-          </View>
-        )}
 
-        <Button
-          mode="contained"
-          onPress={handleLogout}
-          style={styles.logoutButton}
-          buttonColor={theme.colors.error}
-        >
-          Déconnexion
-        </Button>
+            {profileData.reviews && profileData.reviews.length > 0 ? (
+              <View style={styles.reviewsList}>
+                {profileData.reviews.map((review, index) => (
+                  <View key={index} style={styles.reviewItem}>
+                    <View style={styles.reviewHeader}>
+                      <Avatar.Image size={40} source={{ uri: review.reviewer.avatar }} />
+                      <View style={styles.reviewerInfo}>
+                        <Text style={styles.reviewerName}>
+                          {review.reviewer.firstName} {review.reviewer.lastName}
+                        </Text>
+                        <Text style={styles.reviewDate}>
+                          {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true, locale: fr })}
+                        </Text>
+                      </View>
+                      <View style={styles.reviewRating}>
+                        <MaterialCommunityIcons name="star" size={16} color={theme.colors.primary} />
+                        <Text style={styles.reviewRatingText}>{review.rating}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.reviewContent}>{review.content}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 16 }}>
+                Aucun avis pour le moment
+              </Text>
+            )}
+          </View>
+        </Surface>
+      </Animated.View>
+    );
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'accueil':
+        return renderAccueilContent();
+      case 'photos':
+        return renderPhotosContent();
+      case 'avis':
+        return renderAvisContent();
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {renderHeader()}
+        {renderTabs()}
+        {renderContent()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -384,80 +390,102 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 0,
   },
   scrollView: {
     flex: 1,
   },
-  profileHeader: {
+  header: {
     padding: 16,
-    alignItems: 'center',
-    borderRadius: 0,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    shadowColor: 'transparent',
-    borderBottomWidth: 0,
-    elevation: 0,
+  },
+  profileCard: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
   },
   avatarContainer: {
+    alignItems: 'center',
     marginBottom: 16,
-    position: 'relative',
+  },
+  avatar: {
+    backgroundColor: '#E1E1E1',
   },
   editAvatarButton: {
     position: 'absolute',
     right: -8,
     bottom: -8,
+    backgroundColor: 'white',
   },
-  name: {
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  nameInput: {
-    marginBottom: 8,
-    width: '100%',
-  },
-  locationRatingContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 8,
-  },
-  locationContainer: {
-    flexDirection: 'row',
+  userInfo: {
     alignItems: 'center',
   },
-  city: {
-    marginLeft: 4,
+  categoryChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 24,
+    marginBottom: 8,
+    elevation: 0,
+    borderWidth: 0,
   },
-  cityInput: {
-    flex: 1,
-    marginLeft: 4,
+  name: {
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+    backgroundColor: theme.colors.surface,
   },
-  starsContainer: {
+  rating: {
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  memberSince: {
+    marginBottom: 16,
+  },
+  messageButton: {
+    marginTop: 8,
+  },
+  tabsContainer: {
     flexDirection: 'row',
-    marginRight: 4,
+    marginBottom: 16,
   },
-  ratingText: {
-    fontSize: 12,
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   section: {
-    margin: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  sectionCard: {
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
-    marginBottom: 8,
+    marginLeft: 8,
+    fontWeight: '600',
   },
   bio: {
     lineHeight: 20,
-  },
-  bioInput: {
-    width: '100%',
   },
   skillsContainer: {
     flexDirection: 'row',
@@ -465,17 +493,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   skillChip: {
-    marginRight: 8,
     marginBottom: 8,
   },
-  addSkillContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
-  skillInput: {
-    flex: 1,
+  location: {
+    lineHeight: 20,
   },
   photosGrid: {
     flexDirection: 'row',
@@ -483,31 +504,108 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   photoContainer: {
-    width: '48%',
+    width: (SCREEN_WIDTH - 48) / 2,
     aspectRatio: 1,
-    position: 'relative',
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surface,
   },
   photo: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
   },
-  removePhotoButton: {
-    position: 'absolute',
-    right: -8,
-    top: -8,
+  reviewsContainer: {
+    gap: 16,
+    backgroundColor: theme.colors.surface,
   },
-  addPhotoButton: {
-    width: '48%',
-    aspectRatio: 1,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    justifyContent: 'center',
+  ratingOverview: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  ratingStarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  ratingValue: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: theme.colors.onSurface,
+  },
+  ratingCount: {
+    fontSize: 15,
+    color: theme.colors.onSurfaceVariant,
+  },
+  ratingBars: {
+    gap: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
+    padding: 16,
+  },
+  ratingBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ratingNumber: {
+    width: 24,
+    fontSize: 15,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  barContainer: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  percentageText: {
+    width: 40,
+    fontSize: 15,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'right',
+  },
+  reviewsList: {
+    gap: 16,
+  },
+  reviewItem: {
+    gap: 12,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  logoutButton: {
-    margin: 16,
+  reviewerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  reviewerName: {
+    fontWeight: '500',
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#666',
+  },
+  reviewRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  reviewRatingText: {
+    fontWeight: '500',
+  },
+  reviewContent: {
+    lineHeight: 20,
+  },
+  errorText: {
+    marginBottom: 16,
+    color: 'red',
   },
 });
 

@@ -88,7 +88,7 @@ const PostDetailScreen = () => {
 
   const fetchResponses = async () => {
     if (!post) return;
-    
+
     try {
       setLoadingResponses(true);
       const fetchedResponses = await postService.getPostResponses(post.id);
@@ -115,9 +115,9 @@ const PostDetailScreen = () => {
         // Naviguer vers le chat
         navigation.navigate('Chat', {
           postId: post.id,
-          recipientId: post?.requestor.id,
-          recipientName: post?.requestor.name,
-          recipientAvatar: post?.requestor.avatar
+          recipientId: post?.requestor?.id,
+          recipientName: `${post?.requestor?.firstName} ${post?.requestor?.lastName}`,
+          recipientAvatar: post?.requestor?.avatar
         });
       } catch (error) {
         console.error('Erreur lors de la réponse:', error);
@@ -148,7 +148,7 @@ const PostDetailScreen = () => {
 
   const renderActionButtons = () => {
     return (
-      <Animated.View 
+      <Animated.View
         entering={FadeInDown.delay(500)}
         style={styles.actionButtons}
       >
@@ -173,59 +173,95 @@ const PostDetailScreen = () => {
   const renderResponses = () => {
     if (loadingResponses) {
       return (
-        <View style={styles.noResponsesContainer}>
-          <Text>Chargement des réponses...</Text>
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons
+            name="message-processing-outline"
+            size={24}
+            color={theme.colors.onSurfaceVariant}
+          />
+          <Text style={[styles.loadingText, { color: theme.colors.onSurfaceVariant }]}>
+            Chargement des réponses...
+          </Text>
         </View>
       );
     }
-    
+
     if (responses.length === 0) {
       return (
-        <View style={styles.noResponsesContainer}>
-          <Text style={styles.noResponsesText}>Aucune réponse pour le moment</Text>
-        </View>
+        <Animated.View
+          entering={FadeIn.delay(300)}
+          style={styles.noResponsesContainer}
+        >
+          <MaterialCommunityIcons
+            name="message-text-outline"
+            size={48}
+            color={theme.colors.onSurfaceVariant}
+          />
+          <Text style={[styles.noResponsesText, { color: theme.colors.onSurfaceVariant }]}>
+            Aucune réponse pour le moment
+          </Text>
+          <Text style={[styles.noResponsesSubtext, { color: theme.colors.onSurfaceVariant }]}>
+            Soyez le premier à répondre à cette demande
+          </Text>
+        </Animated.View>
       );
     }
 
     return (
       <View style={styles.responsesContainer}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
-          Réponses ({responses.length})
-        </Text>
+        <View style={styles.responseHeader}>
+          <MaterialCommunityIcons
+            name="message-text-outline"
+            size={24}
+            color={theme.colors.primary}
+            style={styles.responseIcon}
+          />
+          <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
+            Réponses ({responses.length})
+          </Text>
+        </View>
+
         {responses.map((response, index) => (
           <Animated.View
             key={response.id}
             entering={FadeInRight.delay(index * 100)}
-            style={styles.responseItem}
+            layout={Layout.springify()}
           >
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Profile', { userId: response.userId })}
-              style={styles.responseHeader}
-            >
-              <Avatar.Image
-                size={40}
-                source={{ uri: response.userAvatar }}
-              />
-              <View style={styles.responseInfo}>
-                <View style={styles.nameRatingContainer}>
-                  <Text style={styles.responseName}>{response.userName}</Text>
-                  {response.userRating !== undefined && (
-                    <View style={styles.ratingContainer}>
-                      <MaterialCommunityIcons
-                        name="star"
-                        size={16}
-                        color={theme.colors.primary}
-                      />
-                      <Text style={styles.ratingText}>
-                        {response.userRating.toFixed(1)}
-                      </Text>
-                    </View>
-                  )}
+            <Surface style={styles.responseCard} elevation={1}>
+              <TouchableOpacity
+                style={styles.responseHeader}
+                onPress={() => navigation.navigate('Profile', { userId: response.responser.id })}
+              >
+                <Avatar.Image
+                  size={40}
+                  source={{ uri: response.responser.avatar }}
+                  style={styles.responseAvatar}
+                />
+                <View style={styles.responseTextContainer}>
+                  <View style={styles.responseHeader}>
+                    <Text style={[styles.responseName, { color: theme.colors.onSurface }]}>
+                      {`${response.responser.firstName} ${response.responser.lastName}`}
+                    </Text>
+                    {response.responser.rating && (
+                      <View style={styles.ratingContainer}>
+                        <MaterialCommunityIcons
+                          name="star"
+                          size={16}
+                          color={theme.colors.primary}
+                        />
+                        <Text style={[styles.ratingText, { color: theme.colors.primary }]}>
+                          {response.responser.rating.average.toFixed(1)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <TimeAgo
+                    date={response.createdAt}
+                    style={[styles.responseTime, { color: theme.colors.onSurfaceVariant }]}
+                  />
                 </View>
-                <TimeAgo date={response.createdAt} style={styles.responseTime} />
-              </View>
-            </TouchableOpacity>
-            {index < responses.length - 1 && <Divider style={styles.responseDivider} />}
+              </TouchableOpacity>
+            </Surface>
           </Animated.View>
         ))}
       </View>
@@ -260,15 +296,20 @@ const PostDetailScreen = () => {
       >
         <Surface style={styles.contentContainer} elevation={0}>
           <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: post.requestor.id })}>
+            <TouchableOpacity 
+              style={styles.userInfo}
+              onPress={() => navigation.navigate('Profile', { userId: post.requestor.id })}
+            >
               <Avatar.Image
-                size={50}
+                size={48}
                 source={{ uri: post.requestor.avatar }}
               />
             </TouchableOpacity>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{post.requestor.name}</Text>
-              <TimeAgo date={post.createdAt} style={styles.timeAgo} />
+              <Text style={[styles.userName, { color: theme.colors.onSurface }]}>
+                {`${post.requestor.firstName} ${post.requestor.lastName}`}
+              </Text>
+              <TimeAgo date={post.createdAt} style={[styles.timeAgo, { color: theme.colors.onSurfaceVariant }]} />
             </View>
           </Animated.View>
 
@@ -277,14 +318,17 @@ const PostDetailScreen = () => {
             <Text style={styles.description}>{post.description}</Text>
           </Animated.View>
 
-          <Animated.View 
+          <Animated.View
             entering={FadeInDown.delay(400)}
             style={styles.metadata}
           >
             <Chip
-              icon="tag"
+              icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
               mode="flat"
-              style={[styles.categoryChip, { backgroundColor: theme.colors.background }]}
+              style={[styles.categoryChip, {
+                backgroundColor: theme.colors.background,
+                color: theme.colors.secondary
+              }]}
             >
               {post.category}
             </Chip>
@@ -292,9 +336,12 @@ const PostDetailScreen = () => {
             {post.location.address && (
               <TouchableOpacity>
                 <Chip
-                  icon="map-marker"
+                  icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
                   mode="flat"
-                  style={[styles.locationChip, { backgroundColor: theme.colors.background }]}
+                  style={[styles.categoryChip, {
+                    backgroundColor: theme.colors.background,
+                    color: theme.colors.secondary
+                  }]}
                 >
                   {`${post.distance.toFixed(1)} km`}
                 </Chip>
@@ -315,16 +362,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface,
-    elevation: 0,
   },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  scrollView: {
+    flex: 1,
   },
   contentContainer: {
+    flex: 1,
     padding: 16,
-    borderRadius: 0,
-    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
   },
   header: {
     flexDirection: 'row',
@@ -332,38 +377,48 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   userInfo: {
-    marginLeft: 12,
     flex: 1,
   },
   userName: {
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 4,
   },
   timeAgo: {
     fontSize: 12,
-    opacity: 0.7,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  responseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  description: {
+  responseName: {
     fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 16,
+    fontWeight: '500',
+    marginRight: 8,
   },
-  metadata: {
+  ratingContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceVariant,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   categoryChip: {
-    marginRight: 8,
-  },
-  locationChip: {
-    marginRight: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 24,
+    marginBottom: 8,
+    elevation: 0,
+    borderWidth: 0,
   },
   actionButtons: {
     position: 'absolute',
@@ -390,66 +445,74 @@ const styles = StyleSheet.create({
     color: 'red',
     marginBottom: 8,
   },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  noResponsesContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 12,
+  },
+  noResponsesText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  noResponsesSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.7,
+  },
   responsesContainer: {
-    marginTop: 16,
+    marginTop: 24,
+  },
+  responseIcon: {
+    marginRight: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  noResponsesContainer: {
-    padding: 16,
-    alignItems: 'center',
+  responseCard: {
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surface,
   },
-  noResponsesText: {
-    fontSize: 16,
-    opacity: 0.7,
+  responseUserInfo: {
+    flexDirection: 'row',
+    padding: 12,
   },
-  responseItem: {
-    marginBottom: 16,
+  responseAvatar: {
+    marginRight: 12,
   },
-  responseHeader: {
+  responseTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  ratingStarsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginTop: 4,
   },
-  responseInfo: {
-    flex: 1,
-    marginLeft: 12,
+  starIcon: {
+    marginRight: 2,
   },
-  responseName: {
-    fontSize: 16,
-    fontWeight: '500',
+  reviewCount: {
+    fontSize: 12,
+    marginLeft: 4,
   },
   responseTime: {
     fontSize: 12,
-    opacity: 0.7,
-  },
-  chatButton: {
-    marginLeft: 8,
-  },
-  responseDivider: {
-    marginVertical: 8,
-  },
-  nameRatingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: theme.colors.surfaceVariant,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  ratingText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.primary,
+    marginTop: 4,
   },
 });
 

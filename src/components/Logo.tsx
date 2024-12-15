@@ -1,22 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { useTheme } from 'react-native-paper';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+
 
 const Logo = () => {
   const theme = useTheme();
   
   return (
     <View style={styles.container}>
-      <MaterialCommunityIcons 
-        name="hammer-wrench" 
-        size={24} 
-        color={theme.colors.primary}
-        style={styles.icon}
-      />
-      <Text style={[styles.logo, { color: theme.colors.primary }]}>
-        Jirani
-      </Text>
+      <Image 
+      source={require('../assets/logo.png')} 
+      style={styles.image} />
     </View>
   );
 };
@@ -25,6 +19,10 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  image: {
+    width: 70,
+    height: 70,
   },
   icon: {
     marginRight: 8,

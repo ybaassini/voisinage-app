@@ -6,8 +6,9 @@ import { chatService } from '../services/chatService';
 import { Conversation } from '../types/chat';
 import { useAuth } from '../hooks/useAuth';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, th } from 'date-fns/locale';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { theme } from '../theme/theme';
 
 const ConversationItem = ({ conversation, currentUserId, onPress }) => {
   const theme = useTheme();
@@ -167,6 +168,7 @@ export default function ConversationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -190,10 +192,17 @@ const styles = StyleSheet.create({
   conversationItem: {
     flexDirection: 'row',
     padding: 16,
+    backgroundColor: theme.colors.surface,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    shadowOffset: { width: 0, height: 0 },
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ccc',
+    borderRadius: 8,
+    marginTop: 8,
+    marginLeft: 8,
+    marginRight: 8,
+    borderWidth:0
   },
   conversationInfo: {
     flex: 1,

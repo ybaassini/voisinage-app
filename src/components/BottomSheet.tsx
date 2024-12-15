@@ -36,11 +36,13 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: theme.colors.background,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 100,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 100,
   },
   contentContainer: {
     height: SCREEN_HEIGHT * 0.90,
@@ -51,11 +53,12 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: -4,
+      height: -2,
     },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: 3.84,
     elevation: 5,
+    zIndex: 100,
   },
   handle: {
     alignSelf: 'center',

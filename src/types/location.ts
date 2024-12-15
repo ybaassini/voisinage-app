@@ -31,13 +31,13 @@ export interface Location {
   address: string;
   
   /** Coordonnées géographiques (optionnel) */
-  coordinates?: Coordinates | null;
+  coordinates: Coordinates;
   
   /** Hash géographique simple (optionnel) */
-  geohash?: string;
+  geohash: string;
   
   /** Données Geofire complètes (optionnel) */
-  g?: GeofireData;
+  g: GeofireData;
 }
 
 /**

@@ -1,3 +1,5 @@
+import { Coordinates } from "./location";
+
 export type Skill = {
   name: string;
   level: number; // 1-5
@@ -17,10 +19,12 @@ export type UserProfile = {
   email: string;
   location: {
     address: string;
-    coordinates?: {
-      latitude: number;
-      longitude: number;
+    coordinates: Coordinates;
+    g: {
+      geohash: string;
+      geopoint: Coordinates;
     };
+    geohash: string;
   };
   rating: {
     average: number; // Sur 5

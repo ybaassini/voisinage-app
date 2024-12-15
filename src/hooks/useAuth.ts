@@ -79,9 +79,21 @@ export const useAuth = () => {
           if (user) {
             setAuthState(prev => ({ ...prev, loading: true }));
             
-            // Récupérer ou créer le profil utilisateur
+            // Récupérer le profil utilisateur
             let userProfile = await userService.getUserProfile(user.uid);
+            
+            if (!userProfile) {
+              console.error('Profil utilisateur non trouvé pour l\'utilisateur:', user.uid);
+              setAuthState({
+                user: null,
+                userProfile: null,
+                loading: false,
+                error: 'Profil utilisateur non trouvé',
+              });
+              return;
+            }
 
+            console.log('Profil utilisateur récupéré:', userProfile);
 
             setAuthState({
               user,

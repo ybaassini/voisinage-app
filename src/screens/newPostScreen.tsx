@@ -1,49 +1,91 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { Text, useTheme, Menu, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, TextInput } from 'react-native';
+import { Text, useTheme, Menu, Divider, Portal, Modal, Chip } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { CATEGORIES, CATEGORY_GROUPS } from '../constants/categories';
+import { SERVICE_CATEGORIES, ServiceCategory, ServiceSubcategory } from '../constants/serviceCategories';
 import { theme } from '../theme/theme';
 import { useForm } from 'react-hook-form';
 import { PostFormData } from '../types/forms';
 import { logger } from '../utils/logger';
 import CustomInput from '../components/forms/CustomInput';
 import CustomButton from '../components/forms/CustomButton';
+import CategorySelectionScreen from './CategorySelectionScreen';
+import { Alert } from 'react-native';
 
 interface NewPostScreenProps {
   isBottomSheet?: boolean;
   onDismiss?: () => void;
+  onClose?: () => void;
+  navigation?: any;
 }
 
-const NewPostScreen = ({ isBottomSheet, onDismiss }: NewPostScreenProps) => {
+interface NewPostFormData {
+  title: string;
+  description: string;
+  category: string;
+  address: string;
+  budget: string;
+  images: string[];
+}
+
+const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPostScreenProps) => {
   const theme = useTheme();
   const { user, userProfile } = useAuthContext();
   const [loading, setLoading] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
+  const [showCategorySelection, setShowCategorySelection] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<ServiceSubcategory | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [showErrors, setShowErrors] = useState(false);
 
-  const form = useForm<PostFormData>({
+  const form = useForm<NewPostFormData>({
     defaultValues: {
       title: '',
-      category: '',
       description: '',
+      category: '',
+      address: '',
+      budget: '',
       images: [],
     },
+    mode: 'onChange',
   });
 
   useRequireAuth();
 
+  const handleCategorySelect = (category: ServiceCategory | null) => {
+    if (category === null) {
+      setSelectedCategory(null);
+      setSelectedSubcategory(null);
+      return;
+    }
+    
+    setSelectedCategory(category);
+  };
+
+  const handleSubcategorySelect = (subcategory: ServiceSubcategory) => {
+    if (!selectedCategory) return;
+    
+    setSelectedSubcategory(subcategory);
+    form.setValue('category', `${selectedCategory.id}_${subcategory.id}`);
+    setShowCategorySelection(false);
+  };
+
   const handlePost = async () => {
-    if (!user || !userProfile) return;
-
-    const formData = form.getValues();
-
     try {
+      setShowErrors(true);
+      
+      if (!form.watch('title') || !form.watch('description') || !selectedCategory) {
+        Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires (titre, description et catégorie)');
+        return;
+      }
+
       setLoading(true);
+      const formData = form.getValues();
+
       await postService.createPost({
         type: 'request',
         title: formData.title,
@@ -57,6 +99,8 @@ const NewPostScreen = ({ isBottomSheet, onDismiss }: NewPostScreenProps) => {
         },
         status: 'active',
         location: userProfile.location || { address: 'Non spécifié', coordinates: null },
+        address: formData.address,
+        budget: formData.budget,
       });
 
       form.reset();
@@ -87,96 +131,109 @@ const NewPostScreen = ({ isBottomSheet, onDismiss }: NewPostScreenProps) => {
     setPhotos(photos.filter((_, i) => i !== index));
   };
 
-  const selectedCategory = CATEGORIES.find(c => c.id === form.watch('category'));
+  const isFormValid = () => {
+    return (
+      form.watch('title').trim() !== '' &&
+      form.watch('description').trim() !== '' &&
+      selectedCategory !== null
+    );
+  };
+
+  if (showCategorySelection) {
+    return (
+      <CategorySelectionScreen
+        selectedCategory={selectedCategory}
+        onCategorySelect={handleCategorySelect}
+        onSubcategorySelect={handleSubcategorySelect}
+        onClose={() => setShowCategorySelection(false)}
+      />
+    );
+  }
 
   return (
     <ScrollView 
       style={[styles.container, isBottomSheet && { backgroundColor: theme.colors.background }]} 
       contentContainerStyle={styles.contentContainer}
     >
+      <StatusBar barStyle="light-content" />
       <Text style={[styles.title]}>Nouvelle demande</Text>
 
       <CustomInput
-        label="Titre"
+        label="Titre de l'annonce *"
         value={form.watch('title')}
         onChangeText={(value) => form.setValue('title', value)}
-        style={[styles.input, { borderWidth: 0 }]}
+        style={styles.input}
         leftIcon="format-title"
+        error={showErrors && form.watch('title').length === 0}
+        helperText={showErrors && form.watch('title').length === 0 ? "Le titre est obligatoire" : ""}
+      />
+
+      <View style={styles.textareaContainer}>
+        <Text style={[styles.label, { color: theme.colors.onSurface }]}>Description détaillée *</Text>
+        <TextInput
+          value={form.watch('description')}
+          onChangeText={(value) => form.setValue('description', value)}
+          multiline
+          numberOfLines={8}
+          style={[
+            styles.textarea,
+            { backgroundColor: theme.colors.surface },
+            showErrors && form.watch('description').length === 0 && styles.errorBorder
+          ]}
+          placeholder="Décrivez votre demande en détail..."
+        />
+        {showErrors && form.watch('description').length === 0 && (
+          <Text style={styles.errorText}>La description est obligatoire</Text>
+        )}
+      </View>
+
+      <CustomInput
+        label="Adresse"
+        value={form.watch('address')}
+        onChangeText={(value) => form.setValue('address', value)}
+        style={styles.input}
+        leftIcon="map-marker"
       />
 
       <CustomInput
-        label="Description"
-        value={form.watch('description')}
-        onChangeText={(value) => form.setValue('description', value)}
-        multiline
-        numberOfLines={4}
+        label="Budget (€)"
+        value={form.watch('budget')}
+        onChangeText={(value) => form.setValue('budget', value)}
         style={styles.input}
-        leftIcon="text"
+        leftIcon="currency-eur"
+        keyboardType="numeric"
       />
 
-      <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Catégorie</Text>
-      <Menu
-        visible={menuVisible}
-        onDismiss={() => setMenuVisible(false)}
-        anchor={
-          <TouchableOpacity
-            style={[
-              styles.categoryButton,
-              { 
-                borderColor: theme.colors.outline,
-                borderWidth: 0,
-                backgroundColor: theme.colors.surface,
-                borderRadius: 4,
-              }
-            ]}
-            onPress={() => setMenuVisible(true)}
-          >
-            <View style={styles.categoryButtonContent}>
-              {selectedCategory ? (
-                <>
-                  <Icon name={selectedCategory.icon} size={20} color={theme.colors.primary} />
-                  <Text style={[styles.categoryButtonText, { color: theme.colors.onSurface }]}>
-                    {selectedCategory.label}
-                  </Text>
-                </>
-              ) : (
-                <Text style={[styles.categoryButtonText, { color: theme.colors.onSurfaceVariant }]}>
-                  Sélectionner une catégorie
-                </Text>
-              )}
-              <Icon name="chevron-down" size={20} color={theme.colors.onSurfaceVariant} />
+      <View style={styles.categorySection}>
+        <Text style={[styles.label, { color: theme.colors.onSurface }]}>Catégorie *</Text>
+        <TouchableOpacity
+          style={[
+            styles.categoryButton,
+            showErrors && !selectedCategory && styles.errorBorder
+          ]}
+          onPress={() => setShowCategorySelection(true)}
+        >
+          {selectedCategory ? (
+            <View style={styles.selectedCategory}>
+              <Icon name={selectedCategory.icon} size={24} color={theme.colors.primary} />
+              <Text style={[styles.categoryText, { color: theme.colors.onSurface }]}>
+                {selectedCategory.label}
+                {selectedSubcategory ? ` > ${selectedSubcategory.label}` : ''}
+              </Text>
             </View>
-          </TouchableOpacity>
-        }
-        style={styles.menu}
-      >
-        {Object.entries(CATEGORY_GROUPS).map(([groupName, categoryIds], groupIndex) => (
-          <React.Fragment key={groupName}>
-            {groupIndex > 0 && <Divider bold />}
-            <Menu.Item
-              title={groupName.replace('_', ' ')}
-              disabled
-              titleStyle={styles.menuGroupTitle}
-            />
-            {categoryIds.map(id => {
-              const categoryItem = CATEGORIES.find(c => c.id === id);
-              if (!categoryItem) return null;
-              
-              return (
-                <Menu.Item
-                  key={id}
-                  title={categoryItem.label}
-                  leadingIcon={props => <Icon {...props} name={categoryItem.icon} />}
-                  onPress={() => {
-                    form.setValue('category', id);
-                    setMenuVisible(false);
-                  }}
-                />
-              );
-            })}
-          </React.Fragment>
-        ))}
-      </Menu>
+          ) : (
+            <View style={styles.selectedCategory}>
+              <Icon name="shape-outline" size={24} color={theme.colors.onSurfaceVariant} />
+              <Text style={[styles.categoryText, { color: theme.colors.onSurfaceVariant }]}>
+                Sélectionner une catégorie
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {showErrors && !selectedCategory && (
+          <Text style={styles.errorText}>La catégorie est obligatoire</Text>
+        )}
+      </View>
 
       <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Photos</Text>
       <View style={styles.photoSection}>
@@ -205,8 +262,12 @@ const NewPostScreen = ({ isBottomSheet, onDismiss }: NewPostScreenProps) => {
         mode="contained"
         onPress={handlePost}
         loading={loading}
-        disabled={!form.watch('title') || !form.watch('description') || !form.watch('category') || loading}
-        style={styles.submitButton}
+        disabled={!isFormValid()}
+        style={[
+          styles.submitButton,
+          !isFormValid() && styles.disabledButton
+        ]}
+        labelStyle={!isFormValid() ? styles.disabledButtonText : undefined}
         icon="send"
       >
         Publier
@@ -221,6 +282,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
   title: {
     fontSize: 24,
@@ -230,37 +292,53 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 16,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 0,
-    borderColor: theme.colors.surface
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  textareaContainer: {
+    marginBottom: 16,
+  },
+  textarea: {
+    minHeight: 160,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 8,
+    padding: 12,
+    textAlignVertical: 'top',
+    fontSize: 16,
+  },
+  errorBorder: {
+    borderColor: 'red',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  categorySection: {
+    marginBottom: 16,
+  },
+  categoryButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 8,
+    padding: 16,
+  },
+  selectedCategory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryText: {
+    marginLeft: 8,
+    fontSize: 16,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
-  },
-  categoryButton: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 16,
-  },
-  categoryButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  categoryButtonText: {
-    flex: 1,
-    fontSize: 16,
-  },
-  menu: {
-    maxWidth: '100%',
-  },
-  menuGroupTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
   },
   photoSection: {
     flexDirection: 'row',
@@ -296,7 +374,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   submitButton: {
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 24,
+    borderRadius: 8,
+  },
+  disabledButton: {
+    backgroundColor: '#E0E0E0',
+    opacity: 0.7,
+  },
+  disabledButtonText: {
+    color: '#9E9E9E',
   },
 });
 

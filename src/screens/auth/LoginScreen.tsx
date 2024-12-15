@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, Surface, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
-import { useAppDispatch, useAppSelector } from '../../store/store';
+import { useAppDispatch } from '../../store/store';
 import { loginUser } from '../../store/slices/authSlice';
 import CustomInput from '../../components/forms/CustomInput';
 import CustomButton from '../../components/forms/CustomButton';
-import { th } from 'date-fns/locale';
+import { useAuth } from '../../hooks/useAuth';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '../../theme/theme';
 
 const validationSchema = Yup.object().shape({
@@ -21,14 +22,29 @@ const validationSchema = Yup.object().shape({
     .required('Le mot de passe est requis'),
 });
 
-const LoginScreen = ({ navigation }: any) => {
+const LoginScreen = () => {
   const dispatch = useAppDispatch();
-  const { loading, error } = useAppSelector((state) => state.auth);
+  const { loading, error, user, userProfile } = useAuth();
   const theme = useTheme();
+  const navigation = useNavigation();
   const [showPassword, setShowPassword] = useState(false);
 
+  useEffect(() => {
+    if (user && userProfile) {
+      // L'utilisateur est connecté et son profil est chargé
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
+    }
+  }, [user, userProfile, navigation]);
+
   const handleLogin = async (values: { email: string; password: string }) => {
-    dispatch(loginUser(values));
+    try {
+      await dispatch(loginUser(values));
+    } catch (error) {
+      console.error('Erreur lors de la connexion:', error);
+    }
   };
 
   return (
