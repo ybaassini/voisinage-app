@@ -23,9 +23,6 @@ export interface PostResponse {
 
   /** Statut de la réponse */
   status?: 'pending' | 'accepted' | 'rejected';
-
-  /** Note donnée à la réponse */
-  rating?: number;
 }
 
 /**

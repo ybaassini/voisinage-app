@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
@@ -13,6 +13,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import Logo from '../components/Logo';
 import ConversationsScreen from '../screens/ConversationsScreen';
 import BottomSheet from '../components/BottomSheet';
+import { unreadCountsService } from '../services/unreadCountsService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -70,6 +71,22 @@ const MainStack = () => {
           headerTintColor: theme.colors.onSurface,
         }}
       />
+      <Stack.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{ 
+          title: 'Profil',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerShadowVisible: false,
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+          headerTintColor: theme.colors.onSurface,
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -77,13 +94,26 @@ const MainStack = () => {
 const MainTabs = () => {
   const theme = useTheme();
   const [isPostSheetVisible, setIsPostSheetVisible] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   
-  // Debug logs
-  console.log('MainTabs render - isPostSheetVisible:', isPostSheetVisible);
+  useEffect(() => {
+    // Subscribe to unread messages count
+    const unsubMessages = unreadCountsService.subscribeToUnreadMessages((count) => {
+      setUnreadMessages(count);
+    });
 
-  // Mock notification counts - à remplacer par des données réelles
-  const unreadMessages = 3;
-  const unreadNotifications = 2;
+    // Subscribe to unread notifications count
+    const unsubNotifications = unreadCountsService.subscribeToUnreadNotifications((count) => {
+      setUnreadNotifications(count);
+    });
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      unsubMessages?.();
+      unsubNotifications?.();
+    };
+  }, []);
 
   const TabIcon = ({ name, size, color, badge }: { name: string; size: number; color: string; badge?: number }) => (
     <View style={styles.iconContainer}>
@@ -150,7 +180,7 @@ const MainTabs = () => {
                 name="bell" 
                 size={size} 
                 color={color}
-                badge={unreadNotifications}
+                badge={unreadNotifications > 0 ? unreadNotifications : undefined}
               />
             ),
           }}
@@ -195,7 +225,7 @@ const MainTabs = () => {
                 name="message" 
                 size={size} 
                 color={color}
-                badge={unreadMessages}
+                badge={unreadMessages > 0 ? unreadMessages : undefined}
               />
             ),
           }}

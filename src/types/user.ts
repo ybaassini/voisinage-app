@@ -16,6 +16,7 @@ export type UserProfile = {
   id: string;
   firstName: string;
   lastName: string;
+  displayName: string;
   email: string;
   location: {
     address: string;

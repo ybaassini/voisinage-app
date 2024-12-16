@@ -132,9 +132,9 @@ const ProfileScreen = () => {
               icon="message"
               style={styles.messageButton}
               onPress={() => navigation.navigate('Chat', {
-                recipientId: profileData.id,
-                recipientName: `${profileData.firstName} ${profileData.lastName}`,
-                recipientAvatar: profileData.avatar
+                conversationId: null,
+                recipient: profileData,
+                postId: null
               })}
             >
               Envoyer un message

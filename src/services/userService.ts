@@ -61,15 +61,13 @@ export const userService = {
       // Construction du profil utilisateur avec les données de Firestore
       const profile: UserProfile = {
         id: userDoc.id,
-        firstName: userData.firstName || '',
-        lastName: userData.lastName || '',
-        email: userData.email || '',
-        bio: userData.bio || '',
-        avatar: userData.avatar || null,
-        location: {
-          address: userData.location?.address || '',
-          coordinates: userData.location?.coordinates || null
-        },
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        displayName: userData.displayName,
+        email: userData.email,
+        bio: userData.bio,
+        avatar: userData.avatar || '',
+        location: userData.location,
         rating: {
           average: userData.rating?.average || 0,
           count: userData.rating?.count || 0
@@ -128,6 +126,21 @@ export const userService = {
     } catch (error) {
       console.error('Erreur lors de la mise à jour du profil utilisateur:', error);
       throw error;
+    }
+  },
+
+  async getUserAvatar(userId: string): Promise<string | null> {
+    try {
+      // Get user profile first to check if avatar exists
+      const userProfile = await this.getUserProfile(userId);
+      if (!userProfile?.avatar) {
+        return null;
+      }
+
+      return userProfile.avatar;
+    } catch (error) {
+      console.error('Error getting user avatar:', error);
+      return null;
     }
   },
 

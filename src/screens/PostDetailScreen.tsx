@@ -31,6 +31,8 @@ import { useRequireAuth } from '../hooks/useRequireAuth';
 import { theme } from '../theme/theme';
 import { useAuth } from '../hooks/useAuth';
 import { PostResponse } from '../types/responses';
+import { useNotificationContext } from '../providers/NotificationProvider';
+import { POST_STATUS } from '../constants/status';
 
 const PostDetailScreen = () => {
   const theme = useTheme();
@@ -38,6 +40,7 @@ const PostDetailScreen = () => {
   const route = useRoute<any>();
   const { user, userProfile } = useAuth();
   const requireAuth = useRequireAuth();
+  const { sendNotification } = useNotificationContext();
   const [post, setPost] = useState<Post | null>(route.params?.post || null);
   const [loading, setLoading] = useState(!route.params?.post);
   const [error, setError] = useState<string | null>(null);
@@ -112,12 +115,14 @@ const PostDetailScreen = () => {
         // Rafraîchir la liste des réponses
         fetchResponses();
 
+        // Vérifier si l'utilisateur est le propriétaire du post
+        const isPostOwner = post?.requestor?.id === user?.uid;
+
         // Naviguer vers le chat
         navigation.navigate('Chat', {
           postId: post.id,
-          recipientId: post?.requestor?.id,
-          recipientName: `${post?.requestor?.firstName} ${post?.requestor?.lastName}`,
-          recipientAvatar: post?.requestor?.avatar
+          recipient: post.requestor,
+          isPostOwner: isPostOwner
         });
       } catch (error) {
         console.error('Erreur lors de la réponse:', error);
@@ -144,7 +149,7 @@ const PostDetailScreen = () => {
         console.error('Erreur lors du like:', error);
       }
     });
-  };
+  }
 
   const renderActionButtons = () => {
     return (
@@ -209,7 +214,7 @@ const PostDetailScreen = () => {
 
     return (
       <View style={styles.responsesContainer}>
-        <View style={styles.responseHeader}>
+        <View style={styles.responsesHeader}>
           <MaterialCommunityIcons
             name="message-text-outline"
             size={24}
@@ -296,20 +301,34 @@ const PostDetailScreen = () => {
       >
         <Surface style={styles.contentContainer} elevation={0}>
           <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
-            <TouchableOpacity 
-              style={styles.userInfo}
-              onPress={() => navigation.navigate('Profile', { userId: post.requestor.id })}
-            >
-              <Avatar.Image
-                size={48}
-                source={{ uri: post.requestor.avatar }}
-              />
-            </TouchableOpacity>
             <View style={styles.userInfo}>
-              <Text style={[styles.userName, { color: theme.colors.onSurface }]}>
-                {`${post.requestor.firstName} ${post.requestor.lastName}`}
-              </Text>
-              <TimeAgo date={post.createdAt} style={[styles.timeAgo, { color: theme.colors.onSurfaceVariant }]} />
+              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: post.requestor.id })}>
+                <Avatar.Image
+                  size={40}
+                  source={{ uri: post.requestor.avatar }}
+                />
+              </TouchableOpacity>
+              <View style={styles.userInfoText}>
+                <Text variant="titleMedium">{`${post.requestor.firstName} ${post.requestor.lastName}`}</Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {post.distance !== undefined ? (
+                    <View style={styles.distanceContainer}>
+                      <MaterialCommunityIcons
+                        name="map-marker-distance"
+                        size={14}
+                        color={theme.colors.onSurfaceVariant}
+                      />
+                      <Text style={styles.distance}>{post.distance.toFixed(1)} km</Text>
+                    </View>
+                  ) : (
+                    <MaterialCommunityIcons
+                      name="map-marker"
+                      size={14}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                  )}
+                </Text>
+              </View>
             </View>
           </Animated.View>
 
@@ -332,21 +351,6 @@ const PostDetailScreen = () => {
             >
               {post.category}
             </Chip>
-
-            {post.location.address && (
-              <TouchableOpacity>
-                <Chip
-                  icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
-                  mode="flat"
-                  style={[styles.categoryChip, {
-                    backgroundColor: theme.colors.background,
-                    color: theme.colors.secondary
-                  }]}
-                >
-                  {`${post.distance.toFixed(1)} km`}
-                </Chip>
-              </TouchableOpacity>
-            )}
           </Animated.View>
 
           {renderResponses()}
@@ -377,7 +381,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   userInfo: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userInfoText: {
+    marginLeft: 12,
   },
   userName: {
     fontSize: 16,
@@ -386,6 +394,34 @@ const styles = StyleSheet.create({
   },
   timeAgo: {
     fontSize: 12,
+  },
+  distanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  distance: {
+    color: theme.colors.onSurfaceVariant,
+    fontSize: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  description: {
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  metadata: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  responsesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   responseHeader: {
     flexDirection: 'row',

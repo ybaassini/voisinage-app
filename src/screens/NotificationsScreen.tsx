@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Surface, useTheme, IconButton, ActivityIndicator, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNotificationContext } from '../contexts/NotificationContext';
+import { useNotificationContext } from '../providers/NotificationProvider';
 import { Notification } from '../types/notification';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useNavigation } from '@react-navigation/native';
 
 const NotificationItem: React.FC<{
   notification: Notification;
@@ -27,32 +28,35 @@ const NotificationItem: React.FC<{
   };
 
   return (
-    <Surface
-      style={[
-        styles.notificationItem,
-        { backgroundColor: notification.read ? theme.colors.surface : theme.colors.surfaceVariant }
-      ]}
-    >
-      <View style={styles.notificationContent}>
-        <IconButton
-          icon={getIcon(notification.type)}
-          size={24}
-          iconColor={theme.colors.primary}
-        />
-        <View style={styles.textContainer}>
-          <Text variant="titleMedium">{notification.title}</Text>
-          <Text variant="bodyMedium">{notification.message}</Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-            {format(notification.createdAt, 'PPp', { locale: fr })}
-          </Text>
+    <TouchableOpacity onPress={onPress}>
+      <Surface
+        style={[
+          styles.notificationItem,
+          { backgroundColor: notification.read ? theme.colors.surface : theme.colors.surfaceVariant }
+        ]}
+      >
+        <View style={styles.notificationContent}>
+          <IconButton
+            icon={getIcon(notification.type)}
+            size={24}
+            iconColor={theme.colors.primary}
+          />
+          <View style={styles.textContainer}>
+            <Text variant="titleMedium">{notification.title}</Text>
+            <Text variant="bodyMedium">{notification.message}</Text>
+            <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+              {format(notification.createdAt, 'PPp', { locale: fr })}
+            </Text>
+          </View>
         </View>
-      </View>
-    </Surface>
+      </Surface>
+    </TouchableOpacity>
   );
 };
 
 const NotificationsScreen = () => {
   const theme = useTheme();
+  const navigation = useNavigation();
   const {
     notifications,
     loading,
@@ -67,8 +71,31 @@ const NotificationsScreen = () => {
     if (!notification.read) {
       await markAsRead(notification.id);
     }
-    // Gérer la navigation en fonction du type de notification
-    // TODO: Implémenter la navigation
+
+    // Navigation basée sur le type de notification
+    switch (notification.type) {
+      case 'message':
+        if (notification.data?.chatId) {
+          navigation.navigate('Chat', {
+            conversationId: notification.data.chatId,
+          });
+        }
+        break;
+      case 'request':
+        if (notification.data?.postId) {
+          navigation.navigate('PostDetail', {
+            postId: notification.data.postId
+          });
+        }
+        break;
+      case 'service':
+        if (notification.data?.requestId) {
+          navigation.navigate('ServiceDetail', {
+            requestId: notification.data.requestId
+          });
+        }
+        break;
+    }
   };
 
   if (loading) {

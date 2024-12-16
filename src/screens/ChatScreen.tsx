@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, Image, SafeAreaView } from 'react-native';
-import { GiftedChat, IMessage, Bubble, InputToolbar, Send } from 'react-native-gifted-chat';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, Image, SafeAreaView, ActivityIndicator } from 'react-native';
+import { GiftedChat, IMessage, Bubble, InputToolbar, Send, BubbleProps, Actions, MessageImage } from 'react-native-gifted-chat';
 import { useTheme, Avatar, Text, Surface, IconButton } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
-import { Message as ChatMessage } from '../types/chat';
+import { Message as ChatMessage, MessageType } from '../types/chat';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { theme } from '../theme/theme';
 import { postService } from '../services/postService';
+import { useNotificationContext } from '../providers/NotificationProvider';
+import { UserProfile } from '../types/user';
+import { notificationService } from '../services/notificationService';
 
 export default function ChatScreen({ navigation }: any) {
   const theme = useTheme();
@@ -16,21 +21,22 @@ export default function ChatScreen({ navigation }: any) {
   const route = useRoute();
   const params = route.params as {
     conversationId?: string;
-    recipientId?: string;
     postId?: string;
-    recipientAvatar?: string;
-    recipientName?: string;
+    recipient: UserProfile;
+    isPostOwner?: boolean;
   };
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const { sendNotification } = useNotificationContext();
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    if (params.recipientName) {
+    if (params.recipient) {
       navigation.setOptions({
         headerShown: false,
       });
     }
-  }, [params.recipientName, navigation]);
+  }, [params.recipient, navigation]);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -48,13 +54,13 @@ export default function ChatScreen({ navigation }: any) {
         console.log('📝 Utilisation de la conversation existante:', params.conversationId);
         setConversationId(params.conversationId);
       } 
-      // Si nous avons un postId et recipientId, chercher une conversation existante
-      else if (params.postId && params.recipientId) {
+      // Si nous avons un postId et recipient.id, chercher une conversation existante
+      else if (params.postId && params.recipient.id) {
         try {
           // Chercher une conversation existante
           const existingConversation = await chatService.findConversationByPostAndParticipants(
             params.postId,
-            [user.uid, params.recipientId]
+            [user.uid, params.recipient.id]
           );
 
           if (existingConversation) {
@@ -70,7 +76,7 @@ export default function ChatScreen({ navigation }: any) {
         console.error('❌ Impossible d\'initialiser le chat: données manquantes', { 
           conversationId: params.conversationId, 
           postId: params.postId,
-          recipientId: params.recipientId 
+          recipientId: params.recipient.id 
         });
         return;
       }
@@ -84,12 +90,19 @@ export default function ChatScreen({ navigation }: any) {
               .map((msg: ChatMessage) => ({
                 _id: msg.id,
                 text: msg.text,
-                createdAt: msg.createdAt,
+                createdAt: msg.createdAt instanceof Date 
+                  ? msg.createdAt 
+                  : (msg.createdAt.seconds ? new Date(msg.createdAt.seconds * 1000) : msg.createdAt),
                 user: {
                   _id: msg.senderId,
                   name: msg.senderName,
                   avatar: msg.senderAvatar
                 },
+                ...(msg.type === 'image' && { image: msg.mediaUrl }),
+                ...(msg.type === 'document' && { 
+                  text: msg.fileName || 'Document',
+                  data: { url: msg.mediaUrl }
+                })
               }))
               .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
           );
@@ -105,78 +118,170 @@ export default function ChatScreen({ navigation }: any) {
         unsubscribe();
       }
     };
-  }, [user, params.conversationId, params.recipientId, params.recipientName, params.postId, conversationId]);
+  }, [user, params.conversationId, params.recipient, params.postId, conversationId]);
 
-  const onSend = useCallback(async (newMessages: IMessage[] = []) => {
-    if (!user || !userProfile) {
-      console.log('❌ Erreur: utilisateur non connecté');
-      return;
+  useEffect(() => {
+    let unsubscribe: () => void;
+
+    const initializeChat = async () => {
+      if (!user || !params.recipient || !params.conversationId) {
+        console.error('❌ Données manquantes pour initialiser le chat');
+        return;
+      }
+
+      const currentConversationId = params.conversationId;
+      console.log('🔄 Initialisation du chat pour la conversation:', currentConversationId);
+
+      // Mark messages as read when entering the chat
+      await chatService.markMessagesAsRead(currentConversationId, user.uid);
+
+      if (currentConversationId) {
+        console.log('👂 Abonnement aux messages de la conversation:', currentConversationId);
+        unsubscribe = chatService.subscribeToMessages(currentConversationId, (newMessages) => {
+          setMessages(
+            newMessages
+              .map((msg: ChatMessage) => ({
+                _id: msg.id,
+                text: msg.text,
+                createdAt: msg.createdAt instanceof Date 
+                  ? msg.createdAt 
+                  : (msg.createdAt.seconds ? new Date(msg.createdAt.seconds * 1000) : msg.createdAt),
+                user: {
+                  _id: msg.senderId,
+                  name: msg.senderName,
+                  avatar: msg.senderAvatar
+                },
+                ...(msg.type === 'image' && { image: msg.mediaUrl }),
+                ...(msg.type === 'document' && { 
+                  text: msg.fileName || 'Document',
+                  data: { url: msg.mediaUrl }
+                })
+              }))
+              .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+          );
+        });
+      }
+    };
+
+    initializeChat();
+
+    return () => {
+      if (unsubscribe) {
+        console.log('👋 Désabonnement des messages');
+        unsubscribe();
+      }
+    };
+  }, [user, params.conversationId, params.recipient, params.postId, conversationId]);
+
+  useEffect(() => {
+    // Marquer les messages comme lus quand l'utilisateur ouvre la conversation
+    if (conversationId && user) {
+      chatService.markConversationAsRead(conversationId, user.uid);
     }
+  }, [conversationId, user]);
 
-    if (!params.recipientId || !params.recipientName) {
-      console.log('❌ Erreur: recipientId ou recipientName manquant');
-      return;
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      await handleMediaUpload(uri, 'image');
     }
+  };
 
-    if (!params.postId) {
-      console.log('❌ Erreur: postId manquant');
+  const pickDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true,
+    });
+
+    if (result.type === 'success') {
+      await handleMediaUpload(result.uri, 'document', result.name);
+    }
+  };
+
+  const handleMediaUpload = async (uri: string, type: MessageType, fileName?: string) => {
+    if (!user || !userProfile || !params.recipient.id || !conversationId) return;
+
+    try {
+      setIsUploading(true);
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const path = `chat/${conversationId}/${Date.now()}_${fileName || 'media'}`;
+      const mediaUrl = await chatService.uploadMedia(blob, path);
+
+      const messageData = {
+        conversationId,
+        type,
+        text: type === 'document' ? `Document: ${fileName}` : '',
+        mediaUrl,
+        mediaType: type,
+        fileName,
+        senderId: user.uid,
+        senderName: userProfile.displayName,
+        senderAvatar: userProfile.avatar,
+        recipientId: params.recipient.id,
+        recipientName: params.recipient.displayName,
+        postId: params.postId,
+      };
+
+      await chatService.sendMessage(messageData);
+    } catch (error) {
+      console.error('Erreur lors de l\'upload du média:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const onSend = useCallback(async (newMessages = []) => {
+    if (!user || !params.recipient || !params.conversationId) {
+      console.error('❌ Données manquantes pour envoyer le message');
       return;
     }
 
     try {
-      console.log('📤 Préparation de l\'envoi du message');
-      
-      let currentConversationId = conversationId;
-      
-      // Si pas de conversationId, créer une nouvelle conversation
-      if (!currentConversationId) {
-        console.log('🔄 Création d\'une nouvelle conversation au premier message');
-        const conversation = await chatService.createConversation({
-          participants: [
-            { 
-              id: user.uid,
-              name: `${userProfile.firstName} ${userProfile.lastName}` || 'User'
-            },
-            { 
-              id: params.recipientId,
-              name: params.recipientName || 'User'
-            }
-          ],
-          postId: params.postId
-        });
-        console.log('✅ Nouvelle conversation créée:', conversation.id);
-        currentConversationId = conversation.id;
-        setConversationId(conversation.id);
-         // Ajouter une réponse
-        await postService.addResponse(params.postId, {
-          userId: user.uid,
-          userName: `${userProfile.firstName} ${userProfile.lastName}` || 'Utilisateur',
-          userAvatar: userProfile.avatar || '',
-          userRating: userProfile.rating.average,
-        });
-      }
+      const currentConversationId = params.conversationId;
 
       const messageData = {
         conversationId: currentConversationId,
+        type: 'text',
         text: newMessages[0].text,
         senderId: user.uid,
-        senderName: `${userProfile.firstName} ${userProfile.lastName}`|| 'User',
+        senderName: userProfile.displayName,
         senderAvatar: userProfile.avatar || '',
-        recipientId: params.recipientId || '',
-        recipientName: params.recipientName || 'User',
+        recipientId: params.recipient.id,
+        recipientName: params.recipient.displayName,
         postId: params.postId,
         read: false
       };
 
       console.log('📤 Envoi du message avec les données:', messageData);
       await chatService.sendMessage(messageData);
-      console.log('✅ Message envoyé avec succès');
+
+      // Create notification if this is a response to a post
+      if (params.postId && params.isPostOwner) {
+        await notificationService.createNotification({
+          userId: params.recipient.id,
+          type: 'post_response',
+          title: 'Nouvelle réponse',
+          message: `${userProfile.displayName} a répondu à votre demande`,
+          data: {
+            postId: params.postId,
+            conversationId: currentConversationId,
+            senderId: user.uid
+          }
+        });
+      }
+
     } catch (error) {
       console.error('❌ Erreur lors de l\'envoi du message:', error);
     }
-  }, [conversationId, user, params.recipientId, params.recipientName, params.postId]);
+  }, [conversationId, user, params.recipient, params.postId, userProfile]);
 
-  const renderBubble = (props) => {
+  const renderBubble = (props: BubbleProps<IMessage>) => {
     return (
       <Bubble
         {...props}
@@ -186,15 +291,15 @@ export default function ChatScreen({ navigation }: any) {
           },
           left: {
             backgroundColor: theme.colors.surfaceVariant,
-          },
+          }
         }}
         textStyle={{
           right: {
-            color: theme.colors.onPrimary,
+            color: '#fff',
           },
           left: {
             color: theme.colors.onSurfaceVariant,
-          },
+          }
         }}
       />
     );
@@ -228,6 +333,39 @@ export default function ChatScreen({ navigation }: any) {
     );
   };
 
+  const renderActions = () => {
+    return (
+      <Actions
+        containerStyle={styles.actionsContainer}
+        icon={() => (
+          <MaterialCommunityIcons
+            name="paperclip"
+            size={24}
+            color={theme.colors.primary}
+          />
+        )}
+        options={{
+          'Choisir une image': pickImage,
+          'Choisir un document': pickDocument,
+          'Annuler': () => {},
+        }}
+        optionTintColor={theme.colors.primary}
+      />
+    );
+  };
+
+  const renderMessageImage = (props: any) => {
+    return (
+      <MessageImage
+        {...props}
+        imageStyle={[
+          styles.messageImage,
+          props.position === 'right' ? { borderTopRightRadius: 0 } : { borderTopLeftRadius: 0 },
+        ]}
+      />
+    );
+  };
+
   if (!user) return null;
 
   return (
@@ -241,22 +379,22 @@ export default function ChatScreen({ navigation }: any) {
             style={styles.backButton}
           />
           <View style={styles.headerInfo}>
-            {params.recipientAvatar ? (
+            {params.recipient.avatar ? (
               <Avatar.Image
                 size={40}
-                source={{ uri: params.recipientAvatar }}
+                source={{ uri: params.recipient.avatar }}
                 style={styles.avatar}
               />
             ) : (
               <Avatar.Text
                 size={40}
-                label={(params.recipientName || 'User').substring(0, 2).toUpperCase()}
+                label={params.recipient.displayName}
                 style={styles.avatar}
               />
             )}
             <View style={styles.headerText}>
               <Text variant="titleMedium" numberOfLines={1}>
-                {params.recipientName || 'Chat'}
+                {params.recipient.displayName || 'Chat'}
               </Text>
               {params.postId && (
                 <Text variant="bodySmall" style={styles.subtitle} numberOfLines={1}>
@@ -273,13 +411,20 @@ export default function ChatScreen({ navigation }: any) {
         onSend={onSend}
         user={{
           _id: user?.uid || '',
+          name: userProfile ? userProfile.displayName : '',
+          avatar: userProfile?.avatar,
         }}
         renderBubble={renderBubble}
+        renderActions={renderActions}
+        renderMessageImage={renderMessageImage}
+        renderSend={renderSend}
+        isLoadingEarlier={isUploading}
+        renderLoading={() => <ActivityIndicator size="large" color={theme.colors.primary} />}
         placeholder="Écrivez votre message..."
-        renderAvatar={null}
         timeFormat="HH:mm"
         dateFormat="DD/MM/YYYY"
-        locale="fr"
+        renderUsernameOnMessage
+        alwaysShowSend
       />
     </SafeAreaView>
   );
@@ -355,5 +500,21 @@ const styles = StyleSheet.create({
   sendIcon: {
     marginRight: 8,
     marginBottom: 8,
+  },
+  actionsContainer: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+    marginRight: 4,
+    marginBottom: 0,
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 13,
+    margin: 3,
+    resizeMode: 'cover',
   },
 });

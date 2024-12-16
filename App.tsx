@@ -17,7 +17,7 @@ import { theme } from './src/theme/theme';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { UserProvider } from './src/contexts/UserContext';
 import { ChatProvider } from './src/contexts/ChatContext';
-import { NotificationProvider } from './src/contexts/NotificationContext';
+import { NotificationProvider } from './src/providers/NotificationProvider';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -34,21 +34,21 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ReduxProvider store={store}>
-        <AuthProvider>
-          <UserProvider>
-            <NotificationProvider>
+        <PaperProvider theme={theme}>
+          <AuthProvider>
+            <UserProvider>
               <ChatProvider>
-                <NavigationContainer>
-                  <PaperProvider theme={theme}>
+                <NotificationProvider>
+                  <NavigationContainer>
                     <SafeAreaProvider>
                       <RootNavigator />
                     </SafeAreaProvider>
-                  </PaperProvider>
-                </NavigationContainer>
+                  </NavigationContainer>
+                </NotificationProvider>
               </ChatProvider>
-            </NotificationProvider>
-          </UserProvider>
-        </AuthProvider>
+            </UserProvider>
+          </AuthProvider>
+        </PaperProvider>
       </ReduxProvider>
     </GestureHandlerRootView>
   );

@@ -69,9 +69,7 @@ const HomeScreen = ({ navigation }: any) => {
         // Naviguer vers le chat
         navigation.navigate('Chat', {
           postId: post.id,
-          recipientId: post.requestor.id,
-          recipientName: `${post.requestor.firstName} ${post.requestor.lastName}`, // post.requestor.,
-          recipientAvatar: post.requestor.avatar
+          recipient: post.requestor,
         });
       } catch (error) {
         console.error('Erreur lors de la réponse:', error);
@@ -174,7 +172,7 @@ const HomeScreen = ({ navigation }: any) => {
 
             <Text variant="bodyLarge" 
               numberOfLines={3} 
-              style={[styles.description, { color: theme.colors.onSurfaceVariant }]}
+              style={[styles.description]}
             >
               {item.description}
             </Text>
@@ -297,16 +295,18 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
   },
   actionLeft: {
     flexDirection: 'row',
+    width: '50%',
   },
   actionRight: {
     flexDirection: 'row',
+    width: '50%',
+    justifyContent: 'flex-end',
   },
   actionButton: {
     flexDirection: 'row',

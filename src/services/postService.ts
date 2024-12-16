@@ -293,18 +293,13 @@ export const postService = {
   async addResponse(postId: string, responseData: Omit<PostResponse, 'id' | 'createdAt'>): Promise<void> {
     try {
       logger.info('Adding response', { postId });
-      
-      // Récupérer le profil utilisateur pour obtenir sa note moyenne
-      const userDoc = await getDoc(doc(db, USERS_COLLECTION, responseData.userId));
-      const userData = userDoc.data();
-      const userRating = userData?.rating;
 
+      // Ajouter la nouvelle réponse au post
       const postRef = doc(db, POSTS_COLLECTION, postId);
-      const responseRef = doc(collection(postRef, RESPONSES_COLLECTION), responseData.userId);
+      const responseRef = doc(collection(postRef, RESPONSES_COLLECTION));
       await setDoc(responseRef, {
         ...responseData,
-        createdAt: serverTimestamp(),
-        userRating
+        createdAt: serverTimestamp()
       });
 
       logger.debug('Response added', { postId });
