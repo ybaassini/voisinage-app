@@ -433,14 +433,14 @@ export default function ChatScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   header: {
     width: '100%',
     backgroundColor: theme.colors.background,
     paddingTop: Platform.OS === 'ios' ? 0 : 8,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.background,
+    borderBottomColor: theme.colors.surfaceVariant,
     shadowColor: 'transparent',
     shadowOpacity: 0,
     elevation: 0,

@@ -34,7 +34,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      const profile = await userService.getCurrentUserProfile(user.uid);
+      const profile = await userService.getUserProfile(user.uid);
       setUserProfile(profile);
     } catch (err) {
       console.error('Erreur lors du chargement du profil:', err);

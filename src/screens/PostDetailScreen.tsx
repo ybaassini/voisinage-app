@@ -9,7 +9,7 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { Text, Avatar, Card, Button, IconButton, useTheme, Surface, Chip, List, Divider } from 'react-native-paper';
+import { Text, Avatar, Card, Button, IconButton, useTheme, Surface, Chip,  } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   FadeInDown,
@@ -260,10 +260,14 @@ const PostDetailScreen = () => {
                       </View>
                     )}
                   </View>
-                  <TimeAgo
-                    date={response.createdAt}
-                    style={[styles.responseTime, { color: theme.colors.onSurfaceVariant }]}
-                  />
+                  <View style={styles.responseTimeContainer}>
+                    <Text style={[styles.responseTimeText, { color: theme.colors.onSurfaceVariant }]}>
+                      a répondu 
+                    </Text>
+                    <TimeAgo
+                      date={response.createdAt}
+                    />
+                  </View>
                 </View>
               </TouchableOpacity>
             </Surface>
@@ -372,7 +376,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    padding: 16,
+    padding: 8,
     borderRadius: 12,
   },
   header: {
@@ -464,7 +468,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderTopWidth: 1,
     borderTopColor: theme.colors.background,
-    padding: 16,
+    padding: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -546,9 +550,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 4,
   },
-  responseTime: {
-    fontSize: 12,
+  responseTimeContainer: {
+    lineHeight: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 4,
+  },
+  responseTimeText: {
+    fontSize: 12,
+    color: theme.colors.onSurfaceVariant,
+    lineHeight: 0,
   },
 });
 

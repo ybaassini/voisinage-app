@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, Surface, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
@@ -48,7 +48,7 @@ const LoginScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -143,7 +143,7 @@ const LoginScreen = () => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 16,
+    padding: 8,
   },
   headerContainer: {
     alignItems: 'center',

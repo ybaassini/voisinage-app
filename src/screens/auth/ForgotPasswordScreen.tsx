@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, Surface, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
@@ -41,7 +41,7 @@ const ForgotPasswordScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -135,7 +135,7 @@ const ForgotPasswordScreen = ({ navigation }: any) => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { Text, Avatar, useTheme, Button, Surface, Chip, IconButton, Image } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { useAuth } from '../hooks/useAuth';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types/user';
@@ -20,7 +20,7 @@ const ProfileScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
-  const { userProfile: currentUserProfile } = useAuth();
+  const { userProfile, signOut } = useAuth();
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ const ProfileScreen = () => {
 
   // Récupérer l'userId des paramètres de route s'il existe
   const userId = route.params?.userId;
-  const isCurrentUser = !userId || (currentUserProfile && userId === currentUserProfile.id);
+  const isCurrentUser = !userId || userProfile?.id === userId;
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -36,10 +36,14 @@ const ProfileScreen = () => {
         setLoading(true);
         setError(null);
 
-        let profile: UserProfile | null;
+        let profile: UserProfile;
+
+        if (!userProfile && !userId) {
+          return;
+        }
 
         if (isCurrentUser) {
-          profile = currentUserProfile;
+          profile = await userService.getUserProfile(userProfile.id);
         } else {
           profile = await userService.getUserProfile(userId);
         }
@@ -58,7 +62,20 @@ const ProfileScreen = () => {
     };
 
     loadProfile();
-  }, [userId, currentUserProfile, isCurrentUser]);
+  }, [userId, userProfile, isCurrentUser]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <IconButton
+          icon="pencil"
+          iconColor={theme.colors.primary}
+          size={24}
+          onPress={() => navigation.navigate('EditProfile')}
+        />
+      ),
+    });
+  }, [navigation, theme.colors]);
 
   if (loading) {
     return (
@@ -207,6 +224,16 @@ const ProfileScreen = () => {
         </Surface>
       </Animated.View>
 
+      <Animated.View entering={FadeInDown.delay(400)} style={styles.section}>
+        <Surface style={[styles.sectionCard]} elevation={1}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="map-marker" size={24} color={theme.colors.primary} />
+            <Text variant="titleMedium" style={styles.sectionTitle}>Localisation</Text>
+          </View>
+          <Text style={styles.location}>{profileData.location.address}</Text>
+        </Surface>
+      </Animated.View>
+
       <Animated.View entering={FadeInDown.delay(300)} style={styles.section}>
         <Surface style={[styles.sectionCard]} elevation={1}>
           <View style={styles.sectionHeader}>
@@ -219,6 +246,7 @@ const ProfileScreen = () => {
                 <Chip
                 icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
                 mode="flat"
+                key={index}
                 style={[styles.categoryChip, { 
                   backgroundColor: theme.colors.background,
                   color: theme.colors.secondary 
@@ -239,10 +267,17 @@ const ProfileScreen = () => {
       <Animated.View entering={FadeInDown.delay(400)} style={styles.section}>
         <Surface style={[styles.sectionCard]} elevation={1}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons name="map-marker" size={24} color={theme.colors.primary} />
-            <Text variant="titleMedium" style={styles.sectionTitle}>Localisation</Text>
+            <MaterialCommunityIcons name="logout" size={24} color={theme.colors.error} />
+            <Text variant="titleMedium" style={styles.sectionTitle}>Déconnexion</Text>
           </View>
-          <Text style={styles.location}>{profileData.location.address}</Text>
+          <Button 
+            mode="contained" 
+            onPress={signOut}
+            buttonColor={theme.colors.error}
+            style={styles.logoutButton}
+          >
+            Se déconnecter
+          </Button>
         </Surface>
       </Animated.View>
     </>
@@ -373,13 +408,13 @@ const ProfileScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {renderHeader()}
         {renderTabs()}
         {renderContent()}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -395,10 +430,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 16,
+    padding: 8,
   },
   profileCard: {
-    padding: 16,
+    padding: 8,
     borderRadius: 12,
     backgroundColor: theme.colors.surface,
   },
@@ -467,7 +502,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   section: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     marginBottom: 16,
   },
   sectionCard: {
@@ -606,6 +641,9 @@ const styles = StyleSheet.create({
   errorText: {
     marginBottom: 16,
     color: 'red',
+  },
+  logoutButton: {
+    marginTop: 16,
   },
 });
 

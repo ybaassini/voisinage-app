@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { userService } from '../services/userService';
-import { UserProfile, CreateUserProfileData } from '../types/user';
+import { UserProfile } from '../types/user';
 
 interface AuthState {
   user: User | null;
@@ -13,44 +13,20 @@ interface AuthState {
 
 export const useAuth = () => {
   const [authState, setAuthState] = useState<AuthState>({
-    user: null,
+    user: auth.currentUser,
     userProfile: null,
     loading: true,
     error: null,
   });
 
-  const createInitialProfile = async (user: UserProfile): Promise<UserProfile> => {
-
-    const profileData: CreateUserProfileData = {
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      bio: 'Bienvenue sur mon profil !',
-      location: {
-        address: 'Non spécifiée',
-        coordinates: {
-          latitude: 0,
-          longitude: 0
-        },
-      },
-      avatar: user.avatar,
-      skills: [],
-      portfolio: [],
-    };
-
-    return await userService.createUserProfile(user.id, profileData);
-  };
-
   const updateProfile = useCallback(async (userId: string, updates: Partial<UserProfile>) => {
     try {
       await userService.updateUserProfile(userId, updates);
-      const updatedProfile = await userService.getUserProfile(userId);
-      if (updatedProfile) {
-        setAuthState(prev => ({
-          ...prev,
-          userProfile: updatedProfile,
-        }));
-      }
+      // Au lieu de refaire un appel, mettre à jour directement l'état
+      setAuthState(prev => ({
+        ...prev,
+        userProfile: prev.userProfile ? { ...prev.userProfile, ...updates } : null,
+      }));
     } catch (error) {
       console.error('Erreur lors de la mise à jour du profil:', error);
       throw error;
@@ -58,6 +34,8 @@ export const useAuth = () => {
   }, []);
 
   const refreshProfile = useCallback(async (userId: string) => {
+    if (!userId || authState.loading) return;
+    
     try {
       const profile = await userService.getUserProfile(userId);
       if (profile) {
@@ -69,48 +47,44 @@ export const useAuth = () => {
     } catch (error) {
       console.error('Erreur lors du rafraîchissement du profil:', error);
     }
+  }, [authState.loading]);
+
+  const signOut = useCallback(async () => {
+    try {
+      await firebaseSignOut(auth);
+      setAuthState({
+        user: null,
+        userProfile: null,
+        loading: false,
+        error: null,
+      });
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+      throw error;
+    }
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (user) => {
-        try {
-          if (user) {
-            setAuthState(prev => ({ ...prev, loading: true }));
-            
-            // Récupérer le profil utilisateur
-            let userProfile = await userService.getUserProfile(user.uid);
-            
-            if (!userProfile) {
-              console.error('Profil utilisateur non trouvé pour l\'utilisateur:', user.uid);
-              setAuthState({
-                user: null,
-                userProfile: null,
-                loading: false,
-                error: 'Profil utilisateur non trouvé',
-              });
-              return;
-            }
+    let isMounted = true;
+    let profileLoading = false;
 
-            console.log('Profil utilisateur récupéré:', userProfile);
-
-            setAuthState({
-              user,
-              userProfile,
-              loading: false,
-              error: null,
-            });
-          } else {
-            setAuthState({
-              user: null,
-              userProfile: null,
-              loading: false,
-              error: null,
-            });
-          }
-        } catch (error) {
-          console.error('Erreur lors de la gestion du profil utilisateur:', error);
+    const loadProfile = async (user: User) => {
+      if (profileLoading || !isMounted) return;
+      
+      profileLoading = true;
+      try {
+        const profile = await userService.getUserProfile(user.uid);
+        if (isMounted) {
+          setAuthState({
+            user,
+            userProfile: profile,
+            loading: false,
+            error: profile ? null : 'Profil non trouvé',
+          });
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement du profil:', error);
+        if (isMounted) {
           setAuthState({
             user: null,
             userProfile: null,
@@ -118,15 +92,54 @@ export const useAuth = () => {
             error: error.message,
           });
         }
+      } finally {
+        profileLoading = false;
       }
-    );
+    };
 
-    return () => unsubscribe();
+    // Charger le profil initial si l'utilisateur est déjà connecté
+    const currentUser = auth.currentUser;
+    if (currentUser && !authState.userProfile && !profileLoading) {
+      loadProfile(currentUser);
+    }
+
+    // Écouter les changements d'authentification
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!isMounted) return;
+
+      if (user) {
+        // Mettre à jour immédiatement l'utilisateur
+        setAuthState(prev => ({
+          ...prev,
+          user,
+          loading: !prev.userProfile,
+        }));
+
+        // Charger le profil si nécessaire
+        if (!authState.userProfile) {
+          loadProfile(user);
+        }
+      } else {
+        // Réinitialiser l'état si déconnecté
+        setAuthState({
+          user: null,
+          userProfile: null,
+          loading: false,
+          error: null,
+        });
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   return {
     ...authState,
     updateProfile,
     refreshProfile,
+    signOut,
   };
 };

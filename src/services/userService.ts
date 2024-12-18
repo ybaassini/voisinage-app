@@ -93,26 +93,6 @@ export const userService = {
     }
   },
 
-  // Récupérer le profil de l'utilisateur courant
-  async getCurrentUserProfile(userId: string | undefined): Promise<UserProfile | null> {
-    if (!userId) {
-      throw new Error('Aucun utilisateur connecté');
-    }
-
-    try {
-      const profile = await this.getUserProfile(userId);
-      
-      if (!profile) {
-        throw new Error('Profil utilisateur non trouvé');
-      }
-
-      return profile;
-    } catch (error) {
-      console.error('Erreur lors de la récupération du profil utilisateur courant:', error);
-      throw error;
-    }
-  },
-
   // Mettre à jour le profil d'un utilisateur
   async updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<void> {
     try {
@@ -147,26 +127,72 @@ export const userService = {
   // Mettre à jour l'avatar d'un utilisateur
   async updateUserAvatar(userId: string, imageUri: string): Promise<string> {
     try {
+      console.log('Début de la mise à jour de l\'avatar pour l\'utilisateur:', userId);
+      console.log('URI de l\'image:', imageUri);
+
       // Créer une référence pour l'image dans Firebase Storage
       const storageRef = ref(storage, `users/${userId}/avatar.jpg`);
+      console.log('Référence de stockage créée:', storageRef.fullPath);
       
       // Convertir l'URI de l'image en blob
+      console.log('Tentative de récupération de l\'image...');
       const response = await fetch(imageUri);
+      if (!response.ok) {
+        throw new Error(`Erreur lors de la récupération de l'image: ${response.status} ${response.statusText}`);
+      }
+      
+      console.log('Image récupérée, conversion en blob...');
       const blob = await response.blob();
+      console.log('Taille du blob:', blob.size, 'bytes');
+      
+      // Vérifier la taille du fichier (max 5MB)
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+      if (blob.size > MAX_FILE_SIZE) {
+        throw new Error('L\'image est trop volumineuse. Taille maximum: 5MB');
+      }
       
       // Upload l'image
-      await uploadBytes(storageRef, blob);
+      console.log('Début du téléchargement vers Firebase Storage...');
+      const uploadResult = await uploadBytes(storageRef, blob);
+      console.log('Image téléchargée avec succès:', uploadResult.metadata);
       
       // Récupérer l'URL de l'image
+      console.log('Récupération de l\'URL de téléchargement...');
       const downloadURL = await getDownloadURL(storageRef);
+      console.log('URL de téléchargement obtenue:', downloadURL);
       
       // Mettre à jour le profil utilisateur avec la nouvelle URL
+      console.log('Mise à jour du profil utilisateur avec la nouvelle URL...');
       await this.updateUserProfile(userId, { avatar: downloadURL });
+      console.log('Profil utilisateur mis à jour avec succès');
       
       return downloadURL;
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'avatar:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('Erreur détaillée lors de la mise à jour de l\'avatar:', {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+        stack: error.stack,
+        serverResponse: error.serverResponse
+      });
+      
+      // Créer un message d'erreur plus descriptif
+      let errorMessage = 'Erreur lors de la mise à jour de l\'avatar: ';
+      if (error.code === 'storage/unauthorized') {
+        errorMessage += 'Accès non autorisé au stockage.';
+      } else if (error.code === 'storage/canceled') {
+        errorMessage += 'Opération annulée.';
+      } else if (error.code === 'storage/invalid-url') {
+        errorMessage += 'URL de l\'image invalide.';
+      } else if (error.code === 'storage/retry-limit-exceeded') {
+        errorMessage += 'Nombre maximum de tentatives dépassé.';
+      } else if (error.code === 'storage/quota-exceeded') {
+        errorMessage += 'Quota de stockage dépassé.';
+      } else {
+        errorMessage += error.message || 'Une erreur inconnue est survenue.';
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 

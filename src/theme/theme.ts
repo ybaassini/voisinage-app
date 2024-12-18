@@ -1,3 +1,4 @@
+
 import { MD3LightTheme, configureFonts } from 'react-native-paper';
 
 const fontConfig = {
@@ -121,7 +122,7 @@ export const theme = {
   colors: {
     ...MD3LightTheme.colors,
     // Couleurs principales
-    primary: '#494CA2',
+    primary: '#641b7e',
     primaryContainer: '#C1B5FAFF',
     onPrimary: '#FFFFFF',
     onPrimaryContainer: '#494CA2',

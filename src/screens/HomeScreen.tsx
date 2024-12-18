@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { Text, Card, Chip, useTheme, IconButton, Avatar, ActivityIndicator } from 'react-native-paper';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -30,9 +30,6 @@ const HomeScreen = ({ navigation }: any) => {
       if (userProfile?.location?.coordinates) {
         // Récupérer les posts à proximité si on a les coordonnées de l'utilisateur
         fetchedPosts = await postService.getNearbyPosts(userProfile.location, searchRadius);
-      } else {
-        // Sinon, récupérer tous les posts
-        fetchedPosts = await postService.getPosts();
       }
 
       setPosts(fetchedPosts);
@@ -65,24 +62,24 @@ const HomeScreen = ({ navigation }: any) => {
   }, [navigation]);
 
   const handleReply = async (post: Post) => {
-      try {
-        // Naviguer vers le chat
-        navigation.navigate('Chat', {
-          postId: post.id,
-          recipient: post.requestor,
-        });
-      } catch (error) {
-        console.error('Erreur lors de la réponse:', error);
-      }
+    try {
+      // Naviguer vers le chat
+      navigation.navigate('Chat', {
+        postId: post.id,
+        recipient: post.requestor,
+      });
+    } catch (error) {
+      console.error('Erreur lors de la réponse:', error);
+    }
   };
 
   const renderPostHeader = useCallback(({ item }: { item: Post }) => (
     <View style={styles.cardHeader}>
       <View style={styles.userInfo}>
         <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.requestor.id })}>
-          <Avatar.Image 
-            size={40} 
-            source={{ uri: item.requestor.avatar }} 
+          <Avatar.Image
+            size={40}
+            source={{ uri: item.requestor.avatar }}
           />
         </TouchableOpacity>
         <View style={styles.userInfoText}>
@@ -90,24 +87,31 @@ const HomeScreen = ({ navigation }: any) => {
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
             {item.distance !== undefined ? (
               <View style={styles.distanceContainer}>
-                <MaterialCommunityIcons 
-                  name="map-marker-distance" 
-                  size={14} 
-                  color={theme.colors.onSurfaceVariant} 
+                <MaterialCommunityIcons
+                  name="map-marker-distance"
+                  size={14}
+                  color={theme.colors.onSurfaceVariant}
                 />
                 <Text style={styles.distance}>{item.distance.toFixed(1)} km</Text>
               </View>
             ) : (
-              <MaterialCommunityIcons 
-                name="map-marker" 
-                size={14} 
-                color={theme.colors.onSurfaceVariant} 
+              <MaterialCommunityIcons
+                name="map-marker"
+                size={14}
+                color={theme.colors.onSurfaceVariant}
               />
             )}
           </Text>
         </View>
       </View>
-      <TimeAgo date={item.createdAt} style={{ color: theme.colors.onSurfaceVariant }} />
+      <View style={styles.responseTimeContainer}>
+        <Text style={[styles.responseTimeText, { color: theme.colors.onSurfaceVariant }]}>
+          posté
+        </Text>
+        <TimeAgo
+          date={item.createdAt}
+        />
+      </View>
     </View>
   ), [theme.colors.onSurfaceVariant, navigation]);
 
@@ -123,8 +127,8 @@ const HomeScreen = ({ navigation }: any) => {
             size={24}
             color={likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant}
           />
-          <Text style={[styles.actionText, { 
-            color: likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant 
+          <Text style={[styles.actionText, {
+            color: likedPosts[item.id] ? theme.colors.error : theme.colors.onSurfaceVariant
           }]}>
             J'aime
           </Text>
@@ -158,28 +162,28 @@ const HomeScreen = ({ navigation }: any) => {
         <TouchableOpacity onPress={() => navigateToPostDetail(item)}>
           <Card.Content style={styles.cardContent}>
             {renderPostHeader({ item })}
-            
+
             <Chip
               icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
               mode="flat"
-              style={[styles.categoryChip, { 
+              style={[styles.categoryChip, {
                 backgroundColor: theme.colors.background,
-                color: theme.colors.secondary 
+                color: theme.colors.secondary
               }]}
             >
               {item.category}
             </Chip>
 
-            <Text variant="bodyLarge" 
-              numberOfLines={3} 
+            <Text variant="bodyLarge"
+              numberOfLines={3}
               style={[styles.description]}
             >
               {item.description}
             </Text>
 
             {item.photos && item.photos?.length > 0 && (
-              <Card.Cover 
-                source={{ uri: item.photos[0] }} 
+              <Card.Cover
+                source={{ uri: item.photos[0] }}
                 style={styles.coverImage}
               />
             )}
@@ -201,7 +205,7 @@ const HomeScreen = ({ navigation }: any) => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {loading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -229,7 +233,7 @@ const HomeScreen = ({ navigation }: any) => {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -247,7 +251,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   list: {
-    padding: 16,
+    padding: 8,
+  },
+  responseTimeContainer: {
+    lineHeight: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  responseTimeText: {
+    fontSize: 12,
+    color: theme.colors.onSurfaceVariant,
+    lineHeight: 0,
   },
   cardContainer: {
     marginBottom: 16,

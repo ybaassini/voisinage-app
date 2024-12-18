@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, Surface, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
@@ -10,14 +10,17 @@ import { registerUser } from '../../store/slices/authSlice';
 import CustomInput from '../../components/forms/CustomInput';
 import CustomButton from '../../components/forms/CustomButton';
 import { theme } from '../../theme/theme';
+import { CreateUserProfileData, Skill } from '../../types/user';
+import * as Location from 'expo-location';
+import * as geofireCommon from 'geofire-common';
 
 const validationSchema = Yup.object().shape({
   lastName: Yup.string()
     .min(2, 'Le nom doit contenir au moins 2 caractères')
     .required('Le nom est requis'),
   firstName: Yup.string()
-    .min(2, 'Le prenom doit contenir au moins 2 caractères')
-    .required('Le prenom est requis'),
+    .min(2, 'Le prénom doit contenir au moins 2 caractères')
+    .required('Le prénom est requis'),
   email: Yup.string()
     .email('Email invalide')
     .required('L\'email est requis'),
@@ -31,6 +34,9 @@ const validationSchema = Yup.object().shape({
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password')], 'Les mots de passe ne correspondent pas')
     .required('La confirmation du mot de passe est requise'),
+  location: Yup.object().shape({
+    address: Yup.string().required('L\'adresse est requise'),
+  }),
 });
 
 const RegisterScreen = ({ navigation }: any) => {
@@ -40,12 +46,60 @@ const RegisterScreen = ({ navigation }: any) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleRegister = async (values: { firstName: string; lastName: string; email: string; password: string }) => {
-    dispatch(registerUser(values));
+  const handleRegister = async (values: any) => {
+    try {
+      // Obtenir les coordonnées à partir de l'adresse
+      const locationResult = await Location.geocodeAsync(values.location.address);
+      
+      if (locationResult.length > 0) {
+        const { latitude, longitude, } = locationResult[0];
+        const geohash = geofireCommon.geohashForLocation([latitude, longitude]);
+        
+        const userProfileData: Partial<CreateUserProfileData> = {
+          firstName: values.firstName,
+          lastName: values.lastName,
+          displayName: `${values.firstName} ${values.lastName}`,
+          email: values.email,
+          bio: values.bio,
+          location: {
+            address: values.location.address,
+            coordinates: { latitude, longitude },
+            g: {
+              geohash, 
+              geopoint: { latitude, longitude }
+            },
+            geohash
+          },
+          skills: [],
+          portfolio: [],
+          avatar: ''
+        };
+
+        dispatch(registerUser({ ...values, profile: userProfileData }));
+      } else {
+        // Gérer le cas où l'adresse n'a pas pu être géocodée
+        console.error('Adresse non trouvée');
+      }
+    } catch (error) {
+      console.error('Erreur lors du géocodage:', error);
+    }
+  };
+
+  const initialValues = {
+    firstName: '',
+    lastName: '',
+    displayName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    bio: '',
+    location: {
+      address: ''
+    }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -72,7 +126,7 @@ const RegisterScreen = ({ navigation }: any) => {
           >
             <Surface style={styles.surface} elevation={2}>
               <Formik
-                initialValues={{ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' }}
+                initialValues={initialValues}
                 validationSchema={validationSchema}
                 onSubmit={handleRegister}
               >
@@ -88,7 +142,7 @@ const RegisterScreen = ({ navigation }: any) => {
                     />
 
                     <CustomInput
-                      label="Nom complet"
+                      label="Nom"
                       value={values.lastName}
                       onChangeText={handleChange('lastName')}
                       onBlur={handleBlur('lastName')}
@@ -97,13 +151,43 @@ const RegisterScreen = ({ navigation }: any) => {
                     />
 
                     <CustomInput
+                      label="Nom d'affichage"
+                      value={values.displayName}
+                      onChangeText={handleChange('displayName')}
+                      onBlur={handleBlur('displayName')}
+                      error={touched.displayName ? errors.displayName : undefined}
+                      leftIcon="account-badge"
+                    />
+
+                    <CustomInput
                       label="Email"
                       value={values.email}
                       onChangeText={handleChange('email')}
                       onBlur={handleBlur('email')}
                       error={touched.email ? errors.email : undefined}
-                      keyboardType="email-address"
                       leftIcon="email"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+
+                    <CustomInput
+                      label="Bio"
+                      value={values.bio}
+                      onChangeText={handleChange('bio')}
+                      onBlur={handleBlur('bio')}
+                      error={touched.bio ? errors.bio : undefined}
+                      leftIcon="text"
+                      multiline
+                      numberOfLines={3}
+                    />
+
+                    <CustomInput
+                      label="Adresse"
+                      value={values.location.address}
+                      onChangeText={handleChange('location.address')}
+                      onBlur={handleBlur('location.address')}
+                      error={touched.location?.address ? errors.location?.address : undefined}
+                      leftIcon="map-marker"
                     />
 
                     <CustomInput
@@ -112,8 +196,8 @@ const RegisterScreen = ({ navigation }: any) => {
                       onChangeText={handleChange('password')}
                       onBlur={handleBlur('password')}
                       error={touched.password ? errors.password : undefined}
-                      secureTextEntry={!showPassword}
                       leftIcon="lock"
+                      secureTextEntry={!showPassword}
                       rightIcon={showPassword ? 'eye-off' : 'eye'}
                       onRightIconPress={() => setShowPassword(!showPassword)}
                     />
@@ -124,34 +208,31 @@ const RegisterScreen = ({ navigation }: any) => {
                       onChangeText={handleChange('confirmPassword')}
                       onBlur={handleBlur('confirmPassword')}
                       error={touched.confirmPassword ? errors.confirmPassword : undefined}
-                      secureTextEntry={!showConfirmPassword}
                       leftIcon="lock-check"
+                      secureTextEntry={!showConfirmPassword}
                       rightIcon={showConfirmPassword ? 'eye-off' : 'eye'}
                       onRightIconPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     />
 
                     {error && (
-                      <Animated.View 
-                        entering={FadeInDown.duration(300)}
-                        style={styles.errorContainer}
-                      >
-                        <Text style={styles.errorText}>{error}</Text>
-                      </Animated.View>
+                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                        {error}
+                      </Text>
                     )}
 
                     <CustomButton
                       mode="contained"
                       onPress={handleSubmit}
                       loading={loading}
-                      icon="account-plus"
+                      style={styles.button}
                     >
                       S'inscrire
                     </CustomButton>
 
                     <CustomButton
-                      mode="outlined"
+                      mode="text"
                       onPress={() => navigation.navigate('Login')}
-                      icon="login"
+                      style={styles.linkButton}
                     >
                       Déjà un compte ? Se connecter
                     </CustomButton>
@@ -162,7 +243,7 @@ const RegisterScreen = ({ navigation }: any) => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -175,45 +256,40 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   headerContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
+    marginTop: 20,
+    marginBottom: 30,
   },
   title: {
-    fontWeight: 'bold',
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   subtitle: {
     textAlign: 'center',
     opacity: 0.7,
   },
   formContainer: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
+    flex: 1,
   },
   surface: {
-    backgroundColor: theme.colors.surface,
-    padding: 24,
-    borderRadius: 16,
+    padding: 20,
+    borderRadius: 10,
   },
   form: {
-    gap: 8,
+    gap: 16,
   },
-  errorContainer: {
-    backgroundColor: 'rgba(176, 0, 32, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#B00020',
-    marginVertical: 8,
+  button: {
+    marginTop: 10,
+  },
+  linkButton: {
+    marginTop: 10,
   },
   errorText: {
-    color: '#B00020',
-    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 10,
   },
 });
 

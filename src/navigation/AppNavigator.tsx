@@ -14,6 +14,8 @@ import Logo from '../components/Logo';
 import ConversationsScreen from '../screens/ConversationsScreen';
 import BottomSheet from '../components/BottomSheet';
 import { unreadCountsService } from '../services/unreadCountsService';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -76,6 +78,22 @@ const MainStack = () => {
         component={ProfileScreen}
         options={{ 
           title: 'Profil',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerShadowVisible: false,
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+          headerTintColor: theme.colors.onSurface,
+        }}
+      />
+      <Stack.Screen 
+        name="EditProfile" 
+        component={EditProfileScreen}
+        options={{ 
+          title: 'Modifier le profil',
           headerShown: true,
           headerStyle: {
             backgroundColor: theme.colors.background,
@@ -284,11 +302,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   publishButtonBackground: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceVariant,
   },
   publishIcon: {
     marginLeft: 1,

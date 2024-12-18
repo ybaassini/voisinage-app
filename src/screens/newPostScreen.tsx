@@ -12,6 +12,7 @@ import { useForm } from 'react-hook-form';
 import { PostFormData } from '../types/forms';
 import { logger } from '../utils/logger';
 import CustomInput from '../components/forms/CustomInput';
+import CustomTextArea from '../components/forms/CustomTextArea';
 import CustomButton from '../components/forms/CustomButton';
 import CategorySelectionScreen from './CategorySelectionScreen';
 import { Alert } from 'react-native';
@@ -168,24 +169,16 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
         helperText={showErrors && form.watch('title').length === 0 ? "Le titre est obligatoire" : ""}
       />
 
-      <View style={styles.textareaContainer}>
-        <Text style={[styles.label, { color: theme.colors.onSurface }]}>Description détaillée *</Text>
-        <TextInput
-          value={form.watch('description')}
-          onChangeText={(value) => form.setValue('description', value)}
-          multiline
-          numberOfLines={8}
-          style={[
-            styles.textarea,
-            { backgroundColor: theme.colors.surface },
-            showErrors && form.watch('description').length === 0 && styles.errorBorder
-          ]}
-          placeholder="Décrivez votre demande en détail..."
-        />
-        {showErrors && form.watch('description').length === 0 && (
-          <Text style={styles.errorText}>La description est obligatoire</Text>
-        )}
-      </View>
+      <CustomTextArea
+        label="Description détaillée *"
+        value={form.watch('description')}
+        onChangeText={(value) => form.setValue('description', value)}
+        error={showErrors && form.watch('description').length === 0}
+        helperText={showErrors && form.watch('description').length === 0 ? "La description est obligatoire" : ""}
+        numberOfLines={8}
+        maxLength={1000}
+        placeholder="Décrivez votre demande en détail..."
+      />
 
       <CustomInput
         label="Adresse"

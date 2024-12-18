@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Surface, useTheme, IconButton, ActivityIndicator, Button } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { useNotificationContext } from '../providers/NotificationProvider';
 import { Notification } from '../types/notification';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNavigation } from '@react-navigation/native';
+import { theme } from '../theme/theme';
 
 const NotificationItem: React.FC<{
   notification: Notification;
@@ -14,37 +15,52 @@ const NotificationItem: React.FC<{
 }> = ({ notification, onPress }) => {
   const theme = useTheme();
 
-  const getIcon = (type: string) => {
-    switch (type) {
-      case 'message':
-        return 'message';
-      case 'request':
-        return 'account-clock';
-      case 'service':
-        return 'handshake';
-      default:
-        return 'bell';
-    }
-  };
-
   return (
     <TouchableOpacity onPress={onPress}>
       <Surface
         style={[
           styles.notificationItem,
-          { backgroundColor: notification.read ? theme.colors.surface : theme.colors.surfaceVariant }
+          !notification.read && {
+            borderLeftWidth: 4,
+            borderLeftColor: theme.colors.primary,
+          }
         ]}
+        elevation={notification.read ? 1 : 2}
       >
         <View style={styles.notificationContent}>
           <IconButton
-            icon={getIcon(notification.type)}
-            size={24}
+            icon={notification.read ? '' : 'circle'}
+            size={12}
             iconColor={theme.colors.primary}
+            style={styles.icon}
           />
+          
           <View style={styles.textContainer}>
-            <Text variant="titleMedium">{notification.title}</Text>
-            <Text variant="bodyMedium">{notification.message}</Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+            <Text 
+              variant="titleMedium" 
+              style={[
+                styles.title,
+                !notification.read && { color: theme.colors.onPrimaryContainer, fontWeight: '600' }
+              ]}
+            >
+              {notification.title}
+            </Text>
+            <Text 
+              variant="bodyMedium"
+              style={[
+                styles.message,
+                !notification.read && { color: theme.colors.onPrimaryContainer }
+              ]}
+            >
+              {notification.message}
+            </Text>
+            <Text 
+              variant="bodySmall" 
+              style={[
+                styles.timestamp,
+                { color: notification.read ? theme.colors.outline : theme.colors.onPrimaryContainer }
+              ]}
+            >
               {format(notification.createdAt, 'PPp', { locale: fr })}
             </Text>
           </View>
@@ -74,24 +90,10 @@ const NotificationsScreen = () => {
 
     // Navigation basée sur le type de notification
     switch (notification.type) {
-      case 'message':
-        if (notification.data?.chatId) {
-          navigation.navigate('Chat', {
-            conversationId: notification.data.chatId,
-          });
-        }
-        break;
       case 'request':
         if (notification.data?.postId) {
           navigation.navigate('PostDetail', {
             postId: notification.data.postId
-          });
-        }
-        break;
-      case 'service':
-        if (notification.data?.requestId) {
-          navigation.navigate('ServiceDetail', {
-            requestId: notification.data.requestId
           });
         }
         break;
@@ -108,29 +110,47 @@ const NotificationsScreen = () => {
 
   if (error) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
-          {error}
-        </Text>
-        <Button mode="contained" onPress={refreshNotifications}>
-          Réessayer
-        </Button>
+    <View style={[styles.container, styles.centerContent]}>
+      <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
+        {error}
+      </Text>
+      <Button mode="contained" onPress={refreshNotifications}>
+        Réessayer
+      </Button>
+    </View>
+  );
+}
+
+  if (!notifications.length) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.container, styles.centerContent]}>
+          <IconButton
+            icon="bell-outline"
+            size={48}
+            iconColor={theme.colors.onSurfaceVariant}
+          />
+          <Text 
+            variant="titleMedium" 
+            style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 8 }}
+          >
+            Aucune notification pour le moment
+          </Text>
+          <Button 
+            mode="text" 
+            onPress={refreshNotifications}
+            style={{ marginTop: 16 }}
+          >
+            Actualiser
+          </Button>
+        </View>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {unreadCount > 0 && (
-        <Button
-          mode="contained-tonal"
-          onPress={markAllAsRead}
-          style={styles.markAllButton}
-        >
-          Tout marquer comme lu
-        </Button>
-      )}
-      
+    <View style={styles.container}>
+    
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}
@@ -148,52 +168,57 @@ const NotificationsScreen = () => {
           />
         }
         contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text variant="bodyLarge">Aucune notification</Text>
-          </View>
-        }
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-  },
-  listContent: {
-    padding: 16,
+    padding: 8
   },
   notificationItem: {
-    marginBottom: 8,
-    borderRadius: 8,
-    elevation: 1,
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: 8,
+    marginVertical: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 0,
+    elevation: 0,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowOffset: { width: 0, height: 0 }
   },
   notificationContent: {
     flexDirection: 'row',
-    padding: 8,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    padding: 12
+  },
+  icon: {
+    margin: 0,
+    marginRight: 8
   },
   textContainer: {
-    flex: 1,
-    marginLeft: 8,
+    flex: 1
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 32,
+  title: {
+    marginBottom: 4
   },
-  markAllButton: {
-    margin: 16,
-    marginBottom: 0,
+  message: {
+    marginBottom: 4
   },
+  timestamp: {
+    opacity: 0.7
+  },
+  listContent: {
+    paddingVertical: 8
+  }
 });
 
 export default NotificationsScreen;
