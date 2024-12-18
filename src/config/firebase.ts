@@ -1,3 +1,4 @@
+
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -5,16 +6,15 @@ import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
 import Constants from 'expo-constants';
 
-// Votre configuration Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyD_kkFBrSweOuSt6Bzw7bvsM8EBTF1tlG8",
-  authDomain: "jirani-5f130.firebaseapp.com",
-  projectId: "jirani-5f130",
-  storageBucket: "jirani-5f130.appspot.com",
-  messagingSenderId: "141735429392",
-  appId: "1:141735429392:web:103a6c5126192cfc1e5195",
-  measurementId: "G-K04LHYYPP0",
-  databaseURL: "https://jirani-5f130-default-rtdb.europe-west1.firebasedatabase.app"
+  apiKey: Constants.manifest?.extra?.firebaseApiKey,
+  authDomain: Constants.manifest?.extra?.firebaseAuthDomain,
+  projectId: Constants.manifest?.extra?.firebaseProjectId,
+  storageBucket: Constants.manifest?.extra?.firebaseStorageBucket,
+  messagingSenderId: Constants.manifest?.extra?.firebaseMessagingSenderId,
+  appId: Constants.manifest?.extra?.firebaseAppId,
+  measurementId: Constants.manifest?.extra?.firebaseMeasurementId,
+  databaseURL: Constants.manifest?.extra?.firebaseDatabaseUrl
 };
 
 // Initialize Firebase

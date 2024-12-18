@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Fonctions de validation communes
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUserData() {
+      let incomingData = request.resource.data;
+      return 
+        incomingData.firstName is string &&
+        incomingData.lastName is string &&
+        incomingData.displayName is string &&
+        incomingData.email is string &&
+        incomingData.location != null;
+    }
+
+    // Règles pour la collection users
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUserData();
+      allow update: if isOwner(userId) && isValidUserData();
+      allow delete: if isOwner(userId);
+    }
+
+    // Règles pour la collection posts
+    match /posts/{postId} {
+      function isPostOwner() {
+        return isAuthenticated() && request.auth.uid == resource.data.userId;
+      }
+
+      function isValidPost() {
+        let post = request.resource.data;
+        return 
+          post.title is string &&
+          post.title.size() >= 3 &&
+          post.title.size() <= 100 &&
+          post.description is string &&
+          post.description.size() <= 1000 &&
+          post.location != null;
+      }
+
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidPost();
+      allow update: if isPostOwner() && isValidPost();
+      allow delete: if isPostOwner();
+    }
+
+    // Règles pour la collection messages
+    match /messages/{messageId} {
+      function isMessageParticipant() {
+        return isAuthenticated() && 
+          (request.auth.uid == resource.data.senderId || 
+           request.auth.uid == resource.data.receiverId);
+      }
+
+      allow read: if isMessageParticipant();
+      allow create: if isAuthenticated() &&
+        request.resource.data.senderId == request.auth.uid;
+      allow update: if isMessageParticipant();
+      allow delete: if isMessageParticipant();
+    }
+
+    // Règles pour la collection notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+    }
+  }
+}

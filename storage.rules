@@ -1,0 +1,45 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Fonction pour vérifier si l'utilisateur est authentifié
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Fonction pour vérifier si l'utilisateur est le propriétaire
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Règles pour les images de profil des utilisateurs
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && 
+        request.resource.size < 5 * 1024 * 1024 && // Limite de 5MB
+        request.resource.contentType.matches('image/.*'); // Uniquement les images
+    }
+
+    // Règles pour les images des posts
+    match /posts/{postId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.size < 10 * 1024 * 1024 && // Limite de 10MB
+        request.resource.contentType.matches('image/.*'); // Uniquement les images
+      allow delete: if isAuthenticated(); // L'auteur du post peut supprimer
+    }
+
+    // Règles pour les pièces jointes des messages
+    match /messages/{messageId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.size < 20 * 1024 * 1024 && // Limite de 20MB
+        (
+          request.resource.contentType.matches('image/.*') || // Images
+          request.resource.contentType.matches('application/pdf') || // PDFs
+          request.resource.contentType.matches('application/msword') || // Documents Word
+          request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        );
+      allow delete: if isAuthenticated();
+    }
+  }
+}
