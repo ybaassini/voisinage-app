@@ -9,6 +9,7 @@ interface NotificationContextType {
   loading: boolean;
   error: string | null;
   unreadCount: number;
+  loadNotifications: () => Promise<void>;
   sendNotification: (userId: string, title: string, message: string, data?: any) => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: (userId: string) => Promise<void>;
@@ -33,7 +34,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const fetchNotifications = async () => {
+  const loadNotifications = async () => {
     if (!user) return;
     
     try {
@@ -43,6 +44,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setNotifications(fetchedNotifications);
       const unreadNotifications = fetchedNotifications.filter(n => !n.read).length;
       setUnreadCount(unreadNotifications);
+      await updateBadgeCount(unreadNotifications);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setError('Failed to load notifications');
@@ -51,11 +53,52 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchNotifications();
+  const refreshNotifications = async () => {
+    await loadNotifications();
+  };
+
+  const sendNotification = async (userId: string, title: string, message: string, data?: any) => {
+    try {
+      await notificationService.sendNotification(userId, title, message, data);
+      await loadNotifications();
+    } catch (err) {
+      console.error('Error sending notification:', err);
+      throw err;
     }
-  }, [user]);
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await notificationService.markAsRead(notificationId);
+      setNotifications(prevNotifications =>
+        prevNotifications.map(notification =>
+          notification.id === notificationId
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+      const newUnreadCount = unreadCount - 1;
+      setUnreadCount(newUnreadCount);
+      await updateBadgeCount(newUnreadCount);
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+      throw err;
+    }
+  };
+
+  const markAllAsRead = async (userId: string) => {
+    try {
+      await notificationService.markAllAsRead(userId);
+      setNotifications(prevNotifications =>
+        prevNotifications.map(notification => ({ ...notification, read: true }))
+      );
+      setUnreadCount(0);
+      await updateBadgeCount(0);
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+      throw err;
+    }
+  };
 
   useEffect(() => {
     if (userProfile?.id && expoPushToken) {
@@ -69,46 +112,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [userProfile?.id]);
 
-  const sendNotification = async (userId: string, title: string, message: string, data?: any) => {
-    await notificationService.createNotification({
-      userId,
-      type: data?.type || 'system',
-      title,
-      message,
-      data
-    });
-    if (userId === user?.uid) {
-      fetchNotifications();
-    }
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    await notificationService.markAsRead(notificationId);
-    setNotifications(prev => 
-      prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
-  };
-
-  const markAllAsRead = async (userId: string) => {
-    await notificationService.markAllAsRead(userId);
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
-  };
-
-  const value = {
-    notifications,
-    loading,
-    error,
-    unreadCount,
-    sendNotification,
-    markAsRead,
-    markAllAsRead,
-    refreshNotifications: fetchNotifications,
-  };
-
   return (
-    <NotificationContext.Provider value={value}>
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        loading,
+        error,
+        unreadCount,
+        loadNotifications,
+        sendNotification,
+        markAsRead,
+        markAllAsRead,
+        refreshNotifications,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );

@@ -16,6 +16,7 @@ import CustomTextArea from '../components/forms/CustomTextArea';
 import CustomButton from '../components/forms/CustomButton';
 import CategorySelectionScreen from './CategorySelectionScreen';
 import { Alert } from 'react-native';
+import AddressAutocompleteInput from '../components/forms/AddressAutocompleteInput';
 
 interface NewPostScreenProps {
   isBottomSheet?: boolean;
@@ -87,20 +88,17 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
       setLoading(true);
       const formData = form.getValues();
 
-      await postService.createPost({
+      await postService.createPost(user.uid,{
         type: 'request',
         title: formData.title,
         description: formData.description,
         category: formData.category,
         photos,
-        requestor: {
-          id: user.uid,
-          name: `${userProfile.firstName} ${userProfile.lastName}` || 'Utilisateur',
-          avatar: userProfile.avatar || '',
-        },
+        requestor: userProfile,
         status: 'active',
-        location: userProfile.location || { address: 'Non spécifié', coordinates: null },
-        address: formData.address,
+        location: {
+          address: formData.address
+        },
         budget: formData.budget,
       });
 
@@ -180,12 +178,12 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
         placeholder="Décrivez votre demande en détail..."
       />
 
-      <CustomInput
-        label="Adresse"
+      <AddressAutocompleteInput
         value={form.watch('address')}
         onChangeText={(value) => form.setValue('address', value)}
-        style={styles.input}
-        leftIcon="map-marker"
+        onSelect={(address) => form.setValue('address', address)}
+        error={showErrors && !form.watch('address')}
+        helperText={showErrors && !form.watch('address') ? "L'adresse est obligatoire" : ""}
       />
 
       <CustomInput
@@ -316,9 +314,10 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.12)',
-    borderRadius: 8,
+    borderColor: theme.colors.outline,
+    borderRadius: 12,
     padding: 16,
+    backgroundColor: theme.colors.surfaceVariant,
   },
   selectedCategory: {
     flexDirection: 'row',
@@ -365,6 +364,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceVariant,
   },
   submitButton: {
     marginTop: 24,

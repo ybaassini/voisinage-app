@@ -1,17 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  User
-} from 'firebase/auth';
-import { auth } from '../../config/firebase';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { authInstance, db } from '../../config/firebase';
 import { userService } from '../../services/userService';
 import { UserProfile } from '../../types/user';
+import * as Location from 'expo-location';
+import * as geofireCommon from 'geofire-common';
 
 interface AuthState {
-  user: User | null;
+  user: FirebaseAuthTypes.User | null;
   userProfile: UserProfile | null;
   loading: boolean;
   error: string | null;
@@ -26,10 +22,9 @@ const initialState: AuthState = {
 
 export const registerUser = createAsyncThunk(
   'auth/register',
-  async ({ email, password, firstName, lastName }: { email: string; password: string; firstName: string; lastName: string }, { rejectWithValue }) => {
+  async ({ email, password }: { email: string; password: string; firstName: string; lastName: string, address: string }, { rejectWithValue }) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName: `${firstName} ${lastName}` });
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password)
       return userCredential.user;
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -42,15 +37,16 @@ export const loginUser = createAsyncThunk(
   async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
     try {
       console.log('Tentative de connexion avec:', email);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const credential = auth.EmailAuthProvider.credential(email, password);
+      const userCredential = await authInstance.signInWithCredential(credential);
       console.log('Connexion réussie:', userCredential.user);
-      
+
       // Récupérer le profil utilisateur
       const userProfile = await userService.getUserProfile(userCredential.user.uid);
       if (!userProfile) {
         throw new Error('Profil utilisateur non trouvé');
       }
-      
+
       return {
         user: userCredential.user,
         userProfile
@@ -68,7 +64,7 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
-      await signOut(auth);
+      await auth().signOut();
     } catch (error: any) {
       return rejectWithValue(error.message);
     }

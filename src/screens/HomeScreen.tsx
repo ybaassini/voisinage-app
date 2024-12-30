@@ -9,6 +9,7 @@ import { postService } from '../services/postService';
 import { Post } from '../types/post';
 import { useAuth } from '../hooks/useAuth';
 import { theme } from '../theme/theme';
+import { convertToDate, formatRelativeTime } from '../utils/dateUtils';
 
 const HomeScreen = ({ navigation }: any) => {
   const theme = useTheme();
@@ -28,8 +29,15 @@ const HomeScreen = ({ navigation }: any) => {
       let fetchedPosts: Post[] = [];
 
       if (userProfile?.location?.coordinates) {
+        // Convertir le rayon de km en mètres
+        const radiusInMeters = searchRadius * 1000;
+
         // Récupérer les posts à proximité si on a les coordonnées de l'utilisateur
-        fetchedPosts = await postService.getNearbyPosts(userProfile.location, searchRadius);
+        fetchedPosts = await postService.getNearbyPosts(
+          userProfile.location.coordinates.latitude,
+          userProfile.location.coordinates.longitude,
+          radiusInMeters
+        );
       }
 
       setPosts(fetchedPosts);
@@ -109,7 +117,7 @@ const HomeScreen = ({ navigation }: any) => {
           posté
         </Text>
         <TimeAgo
-          date={item.createdAt}
+          date={convertToDate(item.createdAt)} 
         />
       </View>
     </View>
@@ -164,12 +172,9 @@ const HomeScreen = ({ navigation }: any) => {
             {renderPostHeader({ item })}
 
             <Chip
-              icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
+              icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.onPrimary} />}
               mode="flat"
-              style={[styles.categoryChip, {
-                backgroundColor: theme.colors.background,
-                color: theme.colors.secondary
-              }]}
+              style={[styles.categoryChip, { color: theme.colors.secondary }]}
             >
               {item.category}
             </Chip>
@@ -289,6 +294,8 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   categoryChip: {
+    backgroundColor: theme.colors.secondary,
+    color: theme.colors.onPrimary,
     alignSelf: 'flex-start',
     paddingHorizontal: 4,
     paddingVertical: 2,

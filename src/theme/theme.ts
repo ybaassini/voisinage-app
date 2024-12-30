@@ -116,20 +116,23 @@ const fontConfig = {
   },
 };
 
+//#006073
+//#DA9E50
+
 export const theme = {
   ...MD3LightTheme,
   fonts: configureFonts({ config: fontConfig }),
   colors: {
     ...MD3LightTheme.colors,
     // Couleurs principales
-    primary: '#641b7e',
-    primaryContainer: '#C1B5FAFF',
+    primary: '#DA9E50',
+    primaryContainer: '#DA9E50',
     onPrimary: '#FFFFFF',
     onPrimaryContainer: '#494CA2',
     
     // Couleurs secondaires
-    secondary: '#F2711C',
-    secondaryContainer: '#FFE0B2',
+    secondary: '#409f7b',
+    secondaryContainer: '#F2935C',
     onSecondary: '#FFFFFF',
     onSecondaryContainer: '#F2711C',
     
@@ -140,7 +143,7 @@ export const theme = {
     onTertiaryContainer: '#1976D2',
     
     // Couleurs de surface et de fond
-    background: '#F2F8FF', // Fond gris clair
+    background: '#006073', // Fond gris clair
     onBackground: '#212121',
     surface: '#FFFFFF', // Surface blanche pour les cartes et éléments
     surfaceVariant: '#FFFFFF', // Surface alternative aussi en blanc

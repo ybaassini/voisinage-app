@@ -47,11 +47,12 @@ export interface Conversation {
     text: string;
     type: MessageType;
     senderId: string;
-    createdAt: Date;
+    createdAt: Date | Timestamp;
   };
   postId?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | Timestamp;
+  updatedAt: Date | Timestamp;
+  unreadCount?: number;
 }
 
 export type CreateConversationData = Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'lastMessage'>;

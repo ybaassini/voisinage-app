@@ -1,351 +1,258 @@
-import { collection, query, where, orderBy, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, serverTimestamp, arrayRemove, arrayUnion, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../config/firebase';
+import { db, storage, firestore } from '../config/firebase';
 import { Post, CreatePostData } from '../types/post';
-import { Location } from '../types/location';
-import * as geofireCommon from 'geofire-common';
-import { COLLECTIONS } from '../constants/collections';
-import { calculateDistance, createGeopoint, isValidLocation } from '../utils/locationUtils';
-import { logger } from '../utils/logger';
 import { PostResponse } from '../types/responses';
-import { POST_STATUS } from '../constants/status';
+import { distanceBetween, geohashForLocation, geohashQueryBounds } from 'geofire-common';
+import { geocodingService } from './geocodingService';
 
-const POSTS_COLLECTION = COLLECTIONS.POSTS;
-const RESPONSES_COLLECTION = COLLECTIONS.RESPONSES;
-const USERS_COLLECTION = COLLECTIONS.USERS;
+class PostService {
+  private readonly COLLECTION_NAME = 'posts';
 
-export const postService = {
-  // Récupérer toutes les demandes actives
-  async getPosts(): Promise<Post[]> {
+  async createPost(userId: string, data: CreatePostData): Promise<string> {
     try {
-      logger.info('Fetching all active posts');
-      
-      const q = query(
-        collection(db, POSTS_COLLECTION),
-        where('status', '==', POST_STATUS.ACTIVE),
-        orderBy('createdAt', 'desc')
-      );
+      // Valider et géocoder l'adresse
+      console.log('🔍 Validation de l\'adresse:', data.location?.address);
+      if (!data.location?.address) {
+        throw new Error('L\'adresse est requise');
+      }
 
-      const querySnapshot = await getDocs(q);
-      const posts = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Post));
+      const geocodingResult = await geocodingService.validateAndGeocodeAddress(data.location.address);
 
-      logger.debug('Retrieved posts', { count: posts.length });
-      return posts;
-    } catch (error) {
-      logger.error('Failed to fetch posts', error);
-      throw error;
-    }
-  },
+      // Créer l'objet location avec les coordonnées géocodées
+      const coordinates = geocodingResult.coordinates;
+      const geohash = geohashForLocation([coordinates.latitude, coordinates.longitude]);
 
-  // Créer un nouveau post
-  async createPost(data: CreatePostData): Promise<string> {
-    try {
-      logger.info('Creating new post', { type: data.type, category: data.category });
-      
-      const { photos, location, ...postData } = data;
-      const photoUrls: string[] = [];
-
-      // Upload photos if any
-      if (photos && photos.length > 0) {
-        logger.debug('Uploading post photos', { count: photos.length });
-        
-        for (const photo of photos) {
-          const photoRef = ref(storage, `posts/${Date.now()}_${photo.name}`);
-          const uploadResult = await uploadBytes(photoRef, photo);
-          const photoUrl = await getDownloadURL(uploadResult.ref);
-          photoUrls.push(photoUrl);
+      const location = {
+        address: geocodingResult.formattedAddress,
+        coordinates: coordinates,
+        geohash: geohash,
+        g: {
+          geohash: geohash,
+          geopoint: coordinates
         }
-      }
+      };
 
-      // Calculate geohash if location is provided
-      let locationData = location;
-      if (isValidLocation(location)) {
-        logger.debug('Calculating geohash for location', {
-          latitude: location.coordinates!.latitude,
-          longitude: location.coordinates!.longitude
-        });
-        
-        const { latitude, longitude } = location.coordinates!;
-        locationData = {
-          ...location,
-          g: createGeopoint(latitude, longitude)
-        };
-      }
+      console.log('📍 Localisation formatée:', location);
 
-      // Create the post
-      const docRef = await addDoc(collection(db, POSTS_COLLECTION), {
-        ...postData,
-        photos: photoUrls,
-        location: locationData,
-        status: POST_STATUS.ACTIVE,
-        createdAt: serverTimestamp()
-      });
+      const postData = {
+        ...data,
+        userId,
+        location,
+        createdAt: firestore.Timestamp.now(),
+        updatedAt: firestore.Timestamp.now(),
+        status: 'active',
+        likes: [],
+        views: 0,
+      };
 
-      logger.info('Post created successfully', { postId: docRef.id });
+      const docRef = await db.collection(this.COLLECTION_NAME).add(postData);
+      console.log('✅ Post créé avec succès:', docRef.id);
       return docRef.id;
     } catch (error) {
-      logger.error('Failed to create post', error);
+      console.error('Error creating post:', error);
       throw error;
     }
-  },
+  }
 
-  // Récupérer les posts à proximité
-  async getNearbyPosts(userLocation: Location, radiusInKm: number = 10): Promise<Post[]> {
+  async getPost(postId: string): Promise<Post | null> {
     try {
-      logger.info('Fetching nearby posts', { radiusInKm });
-      
-      if (!isValidLocation(userLocation)) {
-        logger.error('Invalid user location provided');
-        throw new Error('User location coordinates are required');
-      }
+      const postDoc = await db.collection(this.COLLECTION_NAME).doc(postId).get();
 
-      const center = [
-        userLocation.coordinates!.latitude,
-        userLocation.coordinates!.longitude
-      ];
-
-      logger.debug('Calculating geohash bounds', { center, radiusInKm });
-      const bounds = geofireCommon.geohashQueryBounds(center, radiusInKm * 1000);
-      const posts: Post[] = [];
-
-      const queries = bounds.map(([startHash, endHash]) =>
-        query(
-          collection(db, POSTS_COLLECTION),
-          where('status', '==', POST_STATUS.ACTIVE),
-          where('location.g.geohash', '>=', startHash),
-          where('location.g.geohash', '<=', endHash)
-        )
-      );
-
-      const snapshots = await Promise.all(queries.map(q => getDocs(q)));
-      let processedCount = 0;
-
-      for (const snap of snapshots) {
-        for (const doc of snap.docs) {
-          const postData = doc.data();
-          if (!postData.location?.g?.geopoint) continue;
-
-          const distance = calculateDistance(
-            userLocation.coordinates!,
-            postData.location.g.geopoint
-          );
-
-          if (distance <= radiusInKm) {
-            posts.push({
-              ...postData,
-              id: doc.id,
-              distance
-            } as Post);
-            processedCount++;
-          }
-        }
-      }
-
-      logger.debug('Processed nearby posts', {
-        total: processedCount,
-        matching: posts.length,
-        radiusInKm
-      });
-
-      return posts.sort((a, b) => a.distance - b.distance);
-    } catch (error) {
-      logger.error('Failed to fetch nearby posts', error);
-      throw error;
-    }
-  },
-
-  // Récupérer une demande par son ID
-  async getPostById(id: string): Promise<Post | null> {
-    try {
-      logger.info('Fetching post by ID', { postId: id });
-      
-      const docRef = doc(db, POSTS_COLLECTION, id);
-      const docSnap = await getDoc(docRef);
-      
-      if (!docSnap.exists()) {
-        logger.debug('Post not found', { postId: id });
+      if (!postDoc.exists) {
         return null;
       }
 
-      logger.debug('Post retrieved', { postId: id });
       return {
-        id: docSnap.id,
-        ...docSnap.data()
+        id: postDoc.id,
+        ...postDoc.data()
       } as Post;
     } catch (error) {
-      logger.error('Failed to fetch post', error);
+      console.error('Error getting post:', error);
       throw error;
     }
-  },
+  }
 
-  // Mettre à jour une demande
-  async updatePost(id: string, updateData: Partial<Post>): Promise<void> {
+  async updatePost(postId: string, updates: Partial<Post>): Promise<void> {
     try {
-      logger.info('Updating post', { postId: id });
-      
-      const docRef = doc(db, POSTS_COLLECTION, id);
-      await updateDoc(docRef, updateData);
-
-      logger.debug('Post updated', { postId: id });
+      const postRef = db.collection(this.COLLECTION_NAME).doc(postId);
+      await postRef.update({
+        ...updates,
+        updatedAt: firestore.Timestamp.now()
+      });
     } catch (error) {
-      logger.error('Failed to update post', error);
+      console.error('Error updating post:', error);
       throw error;
     }
-  },
+  }
 
-  // Supprimer une demande
-  async deletePost(id: string): Promise<void> {
+  async deletePost(postId: string): Promise<void> {
     try {
-      logger.info('Deleting post', { postId: id });
-      
-      const docRef = doc(db, POSTS_COLLECTION, id);
-      await deleteDoc(docRef);
-
-      logger.debug('Post deleted', { postId: id });
+      await db.collection(this.COLLECTION_NAME).doc(postId).delete();
     } catch (error) {
-      logger.error('Failed to delete post', error);
+      console.error('Error deleting post:', error);
       throw error;
     }
-  },
+  }
 
-  // Récupérer les demandes d'un utilisateur
+  async uploadPostImage(userId: string, imageUri: string): Promise<string> {
+    try {
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const filename = `posts/${userId}/${Date.now()}.jpg`;
+      const storageRef = storage().ref(filename);
+
+      await storageRef.put(blob);
+      return await storageRef.getDownloadURL();
+    } catch (error) {
+      console.error('Error uploading post image:', error);
+      throw error;
+    }
+  }
+
+  async deletePostImage(imageUrl: string): Promise<void> {
+    try {
+      if (imageUrl) {
+        const storageRef = storage().refFromURL(imageUrl);
+        await storageRef.delete();
+      }
+    } catch (error) {
+      console.error('Error deleting post image:', error);
+      throw error;
+    }
+  }
+
   async getUserPosts(userId: string): Promise<Post[]> {
     try {
-      logger.info('Fetching user posts', { userId });
+      console.log('🔍 Récupération des posts de l\'utilisateur:', userId);
       
-      const q = query(
-        collection(db, POSTS_COLLECTION),
-        where('requestor.id', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
+      // Créer la requête
+      let query = db.collection(this.COLLECTION_NAME)
+        .where('requestor.id', '==', userId)
+        .orderBy('createdAt', 'desc');
 
-      const querySnapshot = await getDocs(q);
-      const posts = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Post));
+      // Exécuter la requête
+      const snapshot = await query.get()
+        .catch(error => {
+          if (error.code === 'failed-precondition') {
+            console.error('❌ Index manquant pour la requête. Veuillez créer un index composé pour requestor.id et createdAt');
+            throw new Error('Index manquant pour la requête');
+          }
+          throw error;
+        });
 
-      logger.debug('Retrieved user posts', { count: posts.length });
+      // Mapper les résultats
+      const posts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('📄 Post trouvé:', {
+          id: doc.id,
+          requestorId: data.requestor?.id,
+          title: data.title,
+          createdAt: data.createdAt
+        });
+        return {
+          id: doc.id,
+          ...data
+        };
+      }) as Post[];
+
+      console.log('✅ Nombre de posts récupérés:', posts.length);
       return posts;
     } catch (error) {
-      logger.error('Failed to fetch user posts', error);
+      console.error('❌ Erreur lors de la récupération des posts:', error);
       throw error;
     }
-  },
+  }
 
-  // Récupérer les demandes par catégorie
-  async getPostsByCategory(category: string): Promise<Post[]> {
+  async getNearbyPosts(latitude: number, longitude: number, radiusInM: number = 5000): Promise<Post[]> {
     try {
-      logger.info('Fetching posts by category', { category });
-      
-      const q = query(
-        collection(db, POSTS_COLLECTION),
-        where('category', '==', category),
-        where('status', '==', POST_STATUS.ACTIVE),
-        orderBy('createdAt', 'desc')
-      );
 
-      const querySnapshot = await getDocs(q);
-      const posts = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Post));
+      const center = [latitude, longitude];
+      const bounds = geohashQueryBounds(center, radiusInM);
+      console.log('Geohash bounds:', bounds);
 
-      logger.debug('Retrieved posts by category', { count: posts.length });
-      return posts;
-    } catch (error) {
-      logger.error('Failed to fetch posts by category', error);
-      throw error;
-    }
-  },
+      let posts: Post[] = [];
 
-  // Ajouter ou retirer un like
-  async toggleLike(postId: string, userId: string): Promise<void> {
-    try {
-      logger.info('Toggling like', { postId, userId });
-      
-      const postRef = doc(db, POSTS_COLLECTION, postId);
-      const postDoc = await getDoc(postRef);
+      for (const b of bounds) {
+        const q = await db
+          .collection(this.COLLECTION_NAME)
+          .orderBy('location.geohash')
+          .startAt(b[0])
+          .endAt(b[1])
+          .get();
 
-      if (!postDoc.exists()) {
-        logger.error('Post not found', { postId });
-        throw new Error('Post non trouvé');
+        q.docs.forEach(doc => {
+          const post = { id: doc.id, ...doc.data() } as Post;
+          const postLocation = post.location.coordinates;
+          const distanceInM = distanceBetween(
+            [postLocation.latitude, postLocation.longitude],
+            center
+          );
+
+          if (distanceInM <= radiusInM) {
+            posts.push({...post, distance: distanceInM});
+          }
+        });
       }
 
-      const likes = postDoc.data().likes || [];
+      return posts;
+    } catch (error) {
+      console.error('Error getting nearby posts:', error);
+      throw error;
+    }
+  }
+
+  async incrementViews(postId: string): Promise<void> {
+    try {
+      const postRef = db.collection(this.COLLECTION_NAME).doc(postId);
+      await postRef.update({
+        views: firestore.FieldValue.increment(1)
+      });
+    } catch (error) {
+      console.error('Error incrementing views:', error);
+      throw error;
+    }
+  }
+
+  async toggleLike(postId: string, userId: string): Promise<void> {
+    try {
+      const postRef = db.collection(this.COLLECTION_NAME).doc(postId);
+      const post = await postRef.get();
+
+      if (!post.exists) {
+        throw new Error('Post not found');
+      }
+
+      const likes = post.data()?.likes || [];
       const isLiked = likes.includes(userId);
 
-      await updateDoc(postRef, {
-        likes: isLiked ? arrayRemove(userId) : arrayUnion(userId)
+      await postRef.update({
+        likes: isLiked
+          ? firestore.FieldValue.arrayRemove(userId)
+          : firestore.FieldValue.arrayUnion(userId)
       });
-
-      logger.debug('Like toggled', { postId, userId });
     } catch (error) {
-      logger.error('Failed to toggle like', error);
+      console.error('Error toggling like:', error);
       throw error;
     }
-  },
+  }
 
-  // Ajouter une réponse à un post
-  async addResponse(postId: string, responseData: Omit<PostResponse, 'id' | 'createdAt'>): Promise<void> {
-    try {
-      logger.info('Adding response', { postId });
-
-      // Ajouter la nouvelle réponse au post
-      const postRef = doc(db, POSTS_COLLECTION, postId);
-      const responseRef = doc(collection(postRef, RESPONSES_COLLECTION));
-      await setDoc(responseRef, {
-        ...responseData,
-        createdAt: serverTimestamp()
-      });
-
-      logger.debug('Response added', { postId });
-    } catch (error) {
-      logger.error('Failed to add response', error);
-      throw error;
-    }
-  },
-
-  // Récupérer les réponses d'un post
   async getPostResponses(postId: string): Promise<PostResponse[]> {
     try {
-      logger.info('Fetching post responses', { postId });
-      
-      const postRef = doc(db, POSTS_COLLECTION, postId);
-      const responsesRef = collection(postRef, RESPONSES_COLLECTION);
-      const q = query(responsesRef, orderBy('createdAt', 'desc'));
-      
-      const querySnapshot = await getDocs(q);
-      const responses = querySnapshot.docs.map(doc => ({
+      const snapshot = await db
+        .collection(this.COLLECTION_NAME)
+        .doc(postId)
+        .collection('responses')
+        .orderBy('createdAt', 'desc')
+        .get();
+
+      return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate().getTime() / 1000,
-      } as PostResponse)).filter(Boolean);
-
-      logger.debug('Retrieved post responses', { count: responses.length });
-      return responses;
+        ...doc.data()
+      })) as PostResponse[];
     } catch (error) {
-      logger.error('Failed to fetch post responses', error);
+      console.error('Error getting post responses:', error);
       throw error;
     }
-  },
+  }
+}
 
-  // Supprimer une réponse
-  async deleteResponse(postId: string, responseId: string): Promise<void> {
-    try {
-      logger.info('Deleting response', { postId, responseId });
-      
-      const postRef = doc(db, POSTS_COLLECTION, postId);
-      const responseRef = doc(collection(postRef, RESPONSES_COLLECTION), responseId);
-      await deleteDoc(responseRef);
-
-      logger.debug('Response deleted', { postId, responseId });
-    } catch (error) {
-      logger.error('Failed to delete response', error);
-      throw error;
-    }
-  },
-};
+export const postService = new PostService();

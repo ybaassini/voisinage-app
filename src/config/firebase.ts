@@ -1,29 +1,47 @@
+import { Platform } from 'react-native';
+import firebase from '@react-native-firebase/app';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
+import database from '@react-native-firebase/database';
+import getEnvVars from './env';
 
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getDatabase } from 'firebase/database';
-import Constants from 'expo-constants';
+const envVars = getEnvVars();
 
 const firebaseConfig = {
-  apiKey: Constants.manifest?.extra?.firebaseApiKey,
-  authDomain: Constants.manifest?.extra?.firebaseAuthDomain,
-  projectId: Constants.manifest?.extra?.firebaseProjectId,
-  storageBucket: Constants.manifest?.extra?.firebaseStorageBucket,
-  messagingSenderId: Constants.manifest?.extra?.firebaseMessagingSenderId,
-  appId: Constants.manifest?.extra?.firebaseAppId,
-  measurementId: Constants.manifest?.extra?.firebaseMeasurementId,
-  databaseURL: Constants.manifest?.extra?.firebaseDatabaseUrl
+  apiKey: envVars.firebaseApiKey,
+  authDomain: envVars.firebaseAuthDomain,
+  projectId: envVars.firebaseProjectId,
+  storageBucket: envVars.firebaseStorageBucket,
+  messagingSenderId: envVars.firebaseMessagingSenderId,
+  appId: envVars.firebaseAppId,
+  measurementId: envVars.firebaseMeasurementId,
+  databaseURL: envVars.firebaseDatabaseUrl
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-// Get Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-export const database = getDatabase(app);
+// Initialize services
+const firestoreDb = firestore();
+const storageInstance = storage;
+const databaseInstance = database();
+const authInstance = auth();
 
-export default app;
+// Enable Firestore offline persistence
+firestoreDb.settings({
+  cacheSizeBytes: firestore.CACHE_SIZE_UNLIMITED
+});
+
+if (Platform.OS === 'ios') {
+  firestoreDb.enableNetwork();
+}
+
+export { 
+  authInstance,
+  firestoreDb as db,
+  storageInstance as storage,
+  databaseInstance as database,
+  firestore
+};

@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Surface, useTheme, IconButton, ActivityIndicator, Button } from 'react-native-paper';
 
 import { useNotificationContext } from '../providers/NotificationProvider';
 import { Notification } from '../types/notification';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { formatDate } from '../utils/dateUtils';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../theme/theme';
+import { useAuth } from '../hooks/useAuth';
 
 const NotificationItem: React.FC<{
   notification: Notification;
@@ -61,7 +61,7 @@ const NotificationItem: React.FC<{
                 { color: notification.read ? theme.colors.outline : theme.colors.onPrimaryContainer }
               ]}
             >
-              {format(notification.createdAt, 'PPp', { locale: fr })}
+              {formatDate(notification.createdAt, 'PPp')}
             </Text>
           </View>
         </View>
@@ -71,36 +71,56 @@ const NotificationItem: React.FC<{
 };
 
 const NotificationsScreen = () => {
-  const theme = useTheme();
-  const navigation = useNavigation();
   const {
     notifications,
     loading,
     error,
+    loadNotifications,
     refreshNotifications,
     markAsRead,
-    markAllAsRead,
-    unreadCount
+    markAllAsRead
   } = useNotificationContext();
+  const { user } = useAuth();
+  const navigation = useNavigation();
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+    }
+  }, [user]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshNotifications();
+    setRefreshing(false);
+  };
 
   const handleNotificationPress = async (notification: Notification) => {
     if (!notification.read) {
       await markAsRead(notification.id);
     }
-
-    // Navigation basée sur le type de notification
-    switch (notification.type) {
-      case 'request':
-        if (notification.data?.postId) {
-          navigation.navigate('PostDetail', {
-            postId: notification.data.postId
-          });
-        }
-        break;
+    
+    // Navigation logic based on notification type
+    if (notification.data?.type === 'message') {
+      navigation.navigate('Chat', {
+        conversationId: notification.data.conversationId,
+        otherParticipant: notification.data.sender
+      });
+    } else if (notification.data?.type === 'post') {
+      navigation.navigate('PostDetail', {
+        postId: notification.data.postId
+      });
     }
   };
 
-  if (loading) {
+  const handleMarkAllAsRead = async () => {
+    if (user) {
+      await markAllAsRead(user.uid);
+    }
+  };
+
+  if (loading && !refreshing) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -108,49 +128,18 @@ const NotificationsScreen = () => {
     );
   }
 
-  if (error) {
-    return (
-    <View style={[styles.container, styles.centerContent]}>
-      <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
-        {error}
-      </Text>
-      <Button mode="contained" onPress={refreshNotifications}>
-        Réessayer
-      </Button>
-    </View>
-  );
-}
-
-  if (!notifications.length) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.container, styles.centerContent]}>
-          <IconButton
-            icon="bell-outline"
-            size={48}
-            iconColor={theme.colors.onSurfaceVariant}
-          />
-          <Text 
-            variant="titleMedium" 
-            style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: 8 }}
-          >
-            Aucune notification pour le moment
-          </Text>
-          <Button 
-            mode="text" 
-            onPress={refreshNotifications}
-            style={{ marginTop: 16 }}
-          >
-            Actualiser
-          </Button>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-    
+      {notifications.length > 0 && (
+        <Button
+          mode="text"
+          onPress={handleMarkAllAsRead}
+          style={styles.markAllButton}
+        >
+          Tout marquer comme lu
+        </Button>
+      )}
+      
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}
@@ -162,12 +151,17 @@ const NotificationsScreen = () => {
         )}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={refreshNotifications}
-            colors={[theme.colors.primary]}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
           />
         }
-        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              Aucune notification
+            </Text>
+          </View>
+        }
       />
     </View>
   );
@@ -218,6 +212,18 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingVertical: 8
+  },
+  markAllButton: {
+    marginHorizontal: 16,
+    marginBottom: 8
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  emptyText: {
+    color: theme.colors.onSurfaceVariant
   }
 });
 

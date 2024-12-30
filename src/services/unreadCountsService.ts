@@ -1,22 +1,18 @@
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { auth } from '../config/firebase';
+import { db, authInstance } from '../config/firebase';
 
 class UnreadCountsService {
   private messageSubscription: (() => void) | null = null;
   private notificationSubscription: (() => void) | null = null;
 
   subscribeToUnreadMessages(callback: (count: number) => void) {
-    const user = auth.currentUser;
+    const user = authInstance.currentUser;
     if (!user) return;
 
-    const q = query(
-      collection(db, 'messages'),
-      where('recipientId', '==', user.uid),
-      where('read', '==', false)
-    );
+    const q = db.collection('messages')
+      .where('recipientId', '==', user.uid)
+      .where('read', '==', false);
 
-    this.messageSubscription = onSnapshot(q, (snapshot) => {
+    this.messageSubscription = q.onSnapshot((snapshot) => {
       const count = snapshot.docs.length;
       callback(count);
     });
@@ -29,16 +25,14 @@ class UnreadCountsService {
   }
 
   subscribeToUnreadNotifications(callback: (count: number) => void) {
-    const user = auth.currentUser;
+    const user = authInstance.currentUser;
     if (!user) return;
 
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', user.uid),
-      where('read', '==', false)
-    );
+    const q = db.collection('notifications')
+      .where('userId', '==', user.uid)
+      .where('read', '==', false);
 
-    this.notificationSubscription = onSnapshot(q, (snapshot) => {
+    this.notificationSubscription = q.onSnapshot((snapshot) => {
       const count = snapshot.docs.length;
       callback(count);
     });
@@ -53,9 +47,11 @@ class UnreadCountsService {
   cleanup() {
     if (this.messageSubscription) {
       this.messageSubscription();
+      this.messageSubscription = null;
     }
     if (this.notificationSubscription) {
       this.notificationSubscription();
+      this.notificationSubscription = null;
     }
   }
 }

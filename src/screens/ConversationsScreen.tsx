@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { Text, Avatar, useTheme, Divider, Badge, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { chatService } from '../services/chatService';
 import { Conversation } from '../types/chat';
 import { useAuth } from '../hooks/useAuth';
-import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../theme/theme';
 import { userService } from '../services/userService';
+import { useChatContext } from '../contexts/ChatContext';
+import { Timestamp } from 'firebase/firestore';
+import { formatDate } from '../utils/dateUtils';
+import { UserProfile } from '../types/user';
 
 const ConversationItem = ({
   conversation,
@@ -49,12 +51,16 @@ const ConversationItem = ({
             style={styles.avatar}
           />
         )}
+        
         <View style={styles.conversationInfo}>
           <View style={styles.conversationHeader}>
             <Text variant="titleMedium">{displayName}</Text>
             {conversation.lastMessage && (
               <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                {format(conversation.lastMessage.createdAt, 'HH:mm', { locale: fr })}
+                {formatDate(
+                  conversation.lastMessage.createdAt,
+                  'HH:mm'
+                )}
               </Text>
             )}
           </View>
@@ -88,127 +94,34 @@ const ConversationItem = ({
 };
 
 const ConversationsScreen = () => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [totalUnread, setTotalUnread] = useState(0);
   const { user, userProfile } = useAuth();
+  const { conversations, loading, loadConversations, refreshConversations } = useChatContext();
   const navigation = useNavigation();
   const theme = useTheme();
 
   useEffect(() => {
-    let conversationsUnsubscribe: (() => void) | undefined;
-    let unreadCountUnsubscribe: (() => void) | undefined;
-
     if (user && userProfile) {
-      console.log('👤 Utilisateur connecté:', user.uid);
-      console.log('👤 Profil utilisateur:', userProfile);
-      
-      if (!userProfile.displayName) {
-        console.error('Le profil utilisateur n\'a pas de displayName');
-        setLoading(false);
-        return;
-      }
-      
-      // S'abonner aux conversations
-      conversationsUnsubscribe = chatService.subscribeToConversations(
-        user.uid,
-        userProfile.displayName,
-        (newConversations) => {
-          console.log(`📱 ConversationsScreen: Réception de ${newConversations.length} conversations`);
-          console.log('📱 Conversations:', JSON.stringify(newConversations, null, 2));
-          // Set conversations immediately without avatars
-          setConversations(newConversations);
-          setLoading(false);
-          setRefreshing(false);
-
-          // Load avatars in the background
-          newConversations.forEach(conversation => {
-            conversation.participants.forEach(participant => {
-              if (participant.id !== user.uid) {
-                userService.getUserAvatar(participant.id)
-                  .then(avatarUrl => {
-                    if (avatarUrl) {
-                      setConversations(prevConversations => 
-                        prevConversations.map(conv => {
-                          if (conv.id === conversation.id) {
-                            return {
-                              ...conv,
-                              participants: conv.participants.map(p => 
-                                p.id === participant.id ? { ...p, avatar: avatarUrl } : p
-                              )
-                            };
-                          }
-                          return conv;
-                        })
-                      );
-                    }
-                  })
-                  .catch(error => {
-                    console.error(`Erreur lors du chargement de l'avatar pour ${participant.id}:`, error);
-                  });
-              }
-            });
-          });
-        }
-      );
-
-      // S'abonner au nombre total de messages non lus
-      unreadCountUnsubscribe = chatService.subscribeToTotalUnreadCount(user.uid, (count) => {
-        console.log('🔢 Mise à jour du nombre total de messages non lus:', count);
-        setTotalUnread(count);
-      });
-    } else {
-      console.log('⚠️ Aucun utilisateur connecté ou profil non chargé');
-      setLoading(false);
+      loadConversations();
     }
-
-    return () => {
-      console.log('🧹 Nettoyage des abonnements');
-      if (conversationsUnsubscribe) {
-        conversationsUnsubscribe();
-      }
-      if (unreadCountUnsubscribe) {
-        unreadCountUnsubscribe();
-      }
-    };
   }, [user, userProfile]);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    // Le rafraîchissement sera géré par le callback de subscribeToConversations
+    await refreshConversations();
+    setRefreshing(false);
   };
 
-  const renderItem = ({ item: conversation }: { item: Conversation }) => {
-    const otherParticipant = conversation.participants.find(
-      (p) => p.id !== user?.uid
-    );
-
-    const displayName = otherParticipant?.displayName || 'Utilisateur';
-    const avatarLabel = displayName.substring(0, 2).toUpperCase();
-
-    return (
-      <ConversationItem
-        conversation={conversation}
-        currentUserId={user?.uid || ''}
-        onPress={() => {
-          if (otherParticipant) {
-            navigation.navigate('Chat', {
-              conversationId: conversation.id,
-              recipient: {
-                id: otherParticipant.id,
-                displayName: otherParticipant.displayName || 'Utilisateur',
-                avatar: otherParticipant.avatar
-              },
-              postId: conversation.postId
-            });
-          }
-        }}
-      />
-    );
+  const navigateToChat = (conversationId: string, otherParticipant: UserProfile, postId?: string) => {
+    navigation.navigate('Chat', {
+      conversationId,
+      postId,
+      recipient:otherParticipant
+    });
   };
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -221,19 +134,31 @@ const ConversationsScreen = () => {
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[theme.colors.primary]}
+        renderItem={({ item }) => (
+          <ConversationItem
+            conversation={item}
+            currentUserId={user?.uid || ''}
+            onPress={() => {
+              const otherParticipant = item.participants.find(
+                (p) => p.id !== user?.uid
+              ) as UserProfile;
+              if (otherParticipant) {
+                navigateToChat(item.id, otherParticipant, item.postId);
+              }
+            }}
           />
+        )}
+        ItemSeparatorComponent={() => <Divider />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
-        ListEmptyComponent={
+        ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
-            <Text variant="bodyLarge">Aucune conversation</Text>
+            <Text style={styles.emptyText}>
+              Aucune conversation pour le moment
+            </Text>
           </View>
-        }
+        )}
       />
     </View>
   );
@@ -293,6 +218,10 @@ const styles = StyleSheet.create({
   },
   avatar: {
     marginRight: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: theme.colors.outline,
   },
 });
 

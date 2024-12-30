@@ -25,6 +25,7 @@ import Animated, {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import TimeAgo from '../components/TimeAgo';
+import ImageViewerModal from '../components/ImageViewerModal';
 import { Post } from '../types/post';
 import { postService } from '../services/postService';
 import { useRequireAuth } from '../hooks/useRequireAuth';
@@ -33,6 +34,7 @@ import { useAuth } from '../hooks/useAuth';
 import { PostResponse } from '../types/responses';
 import { useNotificationContext } from '../providers/NotificationProvider';
 import { POST_STATUS } from '../constants/status';
+import { convertToDate } from '../utils/dateUtils';
 
 const PostDetailScreen = () => {
   const theme = useTheme();
@@ -52,6 +54,9 @@ const PostDetailScreen = () => {
   const [isLiked, setIsLiked] = useState(false);
 
   const scrollY = useSharedValue(0);
+
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     if (route.params?.postId && !post) {
@@ -75,7 +80,7 @@ const PostDetailScreen = () => {
     try {
       setLoading(true);
       setError(null);
-      const fetchedPost = await postService.getPostById(route.params.postId);
+      const fetchedPost = await postService.getPost(route.params.postId);
       if (fetchedPost) {
         setPost(fetchedPost);
       } else {
@@ -265,7 +270,7 @@ const PostDetailScreen = () => {
                       a répondu 
                     </Text>
                     <TimeAgo
-                      date={response.createdAt}
+                      date={convertToDate(response.createdAt)}
                     />
                   </View>
                 </View>
@@ -313,32 +318,85 @@ const PostDetailScreen = () => {
                 />
               </TouchableOpacity>
               <View style={styles.userInfoText}>
-                <Text variant="titleMedium">{`${post.requestor.firstName} ${post.requestor.lastName}`}</Text>
-                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                  {post.distance !== undefined ? (
-                    <View style={styles.distanceContainer}>
-                      <MaterialCommunityIcons
-                        name="map-marker-distance"
-                        size={14}
-                        color={theme.colors.onSurfaceVariant}
-                      />
-                      <Text style={styles.distance}>{post.distance.toFixed(1)} km</Text>
-                    </View>
-                  ) : (
-                    <MaterialCommunityIcons
-                      name="map-marker"
-                      size={14}
-                      color={theme.colors.onSurfaceVariant}
-                    />
-                  )}
+                <Text variant="titleMedium" style={styles.userName}>
+                  {post.requestor?.displayName || 'Utilisateur'}
                 </Text>
+                <View style={styles.locationInfo}>
+                  <MaterialCommunityIcons
+                    name="map-marker"
+                    size={14}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text 
+                    variant="bodySmall" 
+                    style={[styles.locationText, { color: theme.colors.onSurfaceVariant }]}
+                    numberOfLines={1}
+                  >
+                    {post.location?.address || 'Adresse non spécifiée'}
+                  </Text>
+                  {typeof post.distance === 'number' && (
+                    <Text 
+                      variant="bodySmall" 
+                      style={[styles.distanceText, { color: theme.colors.onSurfaceVariant }]}
+                    >
+                      • {post.distance.toFixed(1)} km
+                    </Text>
+                  )}
+                </View>
               </View>
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(300)}>
-            <Text style={styles.title}>{post.title}</Text>
-            <Text style={styles.description}>{post.description}</Text>
+          <Animated.View entering={FadeInDown.delay(300)} style={styles.mainContent}>
+            <Text variant="headlineSmall" style={styles.title}>
+              {post.title}
+            </Text>
+            
+            <Text 
+              variant="bodyLarge" 
+              style={[styles.description, { color: theme.colors.onSurfaceVariant }]}
+              numberOfLines={showFullDescription ? undefined : 3}
+            >
+              {post.description}
+            </Text>
+            
+            {post.description.length > 150 && (
+              <TouchableOpacity 
+                onPress={() => setShowFullDescription(!showFullDescription)}
+                style={styles.showMoreButton}
+              >
+                <Text style={[styles.showMoreText, { color: theme.colors.primary }]}>
+                  {showFullDescription ? 'Voir moins' : 'Voir plus'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {post.photos && post.photos.length > 0 && (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.photosScrollView}
+              >
+                <View style={styles.photosContainer}>
+                  {post.photos.map((photo, index) => (
+                    <TouchableOpacity 
+                      key={index}
+                      style={styles.photoWrapper}
+                      onPress={() => {
+                        setSelectedImageIndex(index);
+                        setShowImageViewer(true);
+                      }}
+                    >
+                      <Image
+                        source={{ uri: photo }}
+                        style={styles.photo}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
           </Animated.View>
 
           <Animated.View
@@ -362,6 +420,13 @@ const PostDetailScreen = () => {
       </Animated.ScrollView>
 
       {renderActionButtons()}
+
+      <ImageViewerModal
+        visible={showImageViewer}
+        images={post.photos || []}
+        initialIndex={selectedImageIndex}
+        onClose={() => setShowImageViewer(false)}
+      />
     </View>
   );
 };
@@ -390,37 +455,56 @@ const styles = StyleSheet.create({
   },
   userInfoText: {
     marginLeft: 12,
+    flex: 1,
   },
   userName: {
-    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
   },
-  timeAgo: {
-    fontSize: 12,
-  },
-  distanceContainer: {
+  locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginTop: 4,
   },
-  distance: {
-    color: theme.colors.onSurfaceVariant,
-    fontSize: 12,
+  locationText: {
+    marginLeft: 4,
+    flex: 1,
+  },
+  distanceText: {
+    marginLeft: 4,
+  },
+  mainContent: {
+    marginTop: 16,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 18,
+    marginBottom: 12,
     fontWeight: '600',
-    marginBottom: 8,
   },
   description: {
-    fontSize: 16,
-    marginBottom: 16,
+    lineHeight: 24,
   },
-  metadata: {
+  showMoreButton: {
+    marginTop: 8,
+  },
+  showMoreText: {
+    fontWeight: '500',
+  },
+  photosScrollView: {
+    marginTop: 16,
+  },
+  photosContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    paddingVertical: 8,
+  },
+  photoWrapper: {
+    marginRight: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  photo: {
+    width: 200,
+    height: 150,
+    borderRadius: 12,
   },
   responsesHeader: {
     flexDirection: 'row',

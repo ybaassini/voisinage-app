@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { onAuthStateChanged, signOut as firebaseSignOut, FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { authInstance } from '../config/firebase';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types/user';
 
 interface AuthState {
-  user: User | null;
+  user: FirebaseAuthTypes.User | null;
   userProfile: UserProfile | null;
   loading: boolean;
   error: string | null;
@@ -13,7 +13,7 @@ interface AuthState {
 
 export const useAuth = () => {
   const [authState, setAuthState] = useState<AuthState>({
-    user: auth.currentUser,
+    user: authInstance.currentUser as FirebaseAuthTypes.User | null,
     userProfile: null,
     loading: true,
     error: null,
@@ -51,7 +51,7 @@ export const useAuth = () => {
 
   const signOut = useCallback(async () => {
     try {
-      await firebaseSignOut(auth);
+      await firebaseSignOut(authInstance);
       setAuthState({
         user: null,
         userProfile: null,
@@ -68,7 +68,7 @@ export const useAuth = () => {
     let isMounted = true;
     let profileLoading = false;
 
-    const loadProfile = async (user: User) => {
+    const loadProfile = async (user: FirebaseAuthTypes.User) => {
       if (profileLoading || !isMounted) return;
       
       profileLoading = true;
@@ -98,13 +98,13 @@ export const useAuth = () => {
     };
 
     // Charger le profil initial si l'utilisateur est déjà connecté
-    const currentUser = auth.currentUser;
+    const currentUser = authInstance.currentUser;
     if (currentUser && !authState.userProfile && !profileLoading) {
       loadProfile(currentUser);
     }
 
     // Écouter les changements d'authentification
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
       if (!isMounted) return;
 
       if (user) {

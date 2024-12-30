@@ -1,16 +1,13 @@
-import { collection, doc, getDoc, setDoc, updateDoc, Timestamp, runTransaction, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../config/firebase';
+import { db, storage, firestore } from '../config/firebase';
 import { UserProfile, CreateUserProfileData, Portfolio, Skill } from '../types/user';
 import { v4 as uuidv4 } from 'uuid';
 
-const USERS_COLLECTION = 'users';
+class UserService {
+  private readonly COLLECTION_NAME = 'users';
 
-export const userService = {
-  // Créer ou mettre à jour le profil d'un utilisateur
   async createUserProfile(userId: string, data: CreateUserProfileData): Promise<UserProfile> {
     try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
+      const userRef = db.collection(this.COLLECTION_NAME).doc(userId);
       const now = new Date();
       
       const userData = {
@@ -23,11 +20,11 @@ export const userService = {
         skills: data.skills || [],
         portfolio: data.portfolio || [],
         avatar: data.avatar || '',
-        createdAt: Timestamp.fromDate(now),
-        lastLoginAt: Timestamp.fromDate(now),
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        lastLoginAt: firestore.FieldValue.serverTimestamp(),
       };
 
-      await setDoc(userRef, userData);
+      await userRef.set(userData);
 
       return {
         ...userData,
@@ -38,21 +35,20 @@ export const userService = {
       console.error('Erreur lors de la création du profil utilisateur:', error);
       throw error;
     }
-  },
+  }
 
-  // Récupérer le profil d'un utilisateur
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await getDoc(userRef);
-
-      console.log('userDoc', userDoc.data());
-
-      if (!userDoc.exists()) {
+      const userDoc = await db.collection(this.COLLECTION_NAME).doc(userId).get();
+      if (!userDoc.exists) {
         return null;
       }
 
       const userData = userDoc.data();
+
+      if (!userData) {
+        throw new Error('User data is missing');
+      }
 
       // Conversion des timestamps Firestore en objets Date
       const createdAt = userData.createdAt?.toDate() || new Date();
@@ -91,23 +87,22 @@ export const userService = {
       console.error('Erreur lors de la récupération du profil utilisateur:', error);
       throw error;
     }
-  },
+  }
 
-  // Mettre à jour le profil d'un utilisateur
   async updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<void> {
     try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
+      const userRef = db.collection(this.COLLECTION_NAME).doc(userId);
       const updateData = {
         ...data,
-        lastLoginAt: Timestamp.fromDate(new Date()),
+        lastLoginAt: firestore.FieldValue.serverTimestamp(),
       };
 
-      await updateDoc(userRef, updateData);
+      await userRef.update(updateData);
     } catch (error) {
       console.error('Erreur lors de la mise à jour du profil utilisateur:', error);
       throw error;
     }
-  },
+  }
 
   async getUserAvatar(userId: string): Promise<string | null> {
     try {
@@ -122,16 +117,15 @@ export const userService = {
       console.error('Error getting user avatar:', error);
       return null;
     }
-  },
+  }
 
-  // Mettre à jour l'avatar d'un utilisateur
   async updateUserAvatar(userId: string, imageUri: string): Promise<string> {
     try {
       console.log('Début de la mise à jour de l\'avatar pour l\'utilisateur:', userId);
       console.log('URI de l\'image:', imageUri);
 
       // Créer une référence pour l'image dans Firebase Storage
-      const storageRef = ref(storage, `users/${userId}/avatar.jpg`);
+      const storageRef = storage().ref(`users/${userId}/avatar.jpg`);
       console.log('Référence de stockage créée:', storageRef.fullPath);
       
       // Convertir l'URI de l'image en blob
@@ -153,12 +147,12 @@ export const userService = {
       
       // Upload l'image
       console.log('Début du téléchargement vers Firebase Storage...');
-      const uploadResult = await uploadBytes(storageRef, blob);
+      const uploadResult = await storageRef.put(blob);
       console.log('Image téléchargée avec succès:', uploadResult.metadata);
       
       // Récupérer l'URL de l'image
       console.log('Récupération de l\'URL de téléchargement...');
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await storageRef.getDownloadURL();
       console.log('URL de téléchargement obtenue:', downloadURL);
       
       // Mettre à jour le profil utilisateur avec la nouvelle URL
@@ -194,26 +188,24 @@ export const userService = {
       
       throw new Error(errorMessage);
     }
-  },
+  }
 
-  // Ajouter une compétence
   async addSkill(userId: string, skill: Skill): Promise<void> {
     try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      await updateDoc(userRef, {
-        skills: arrayUnion(skill)
+      const userRef = db.collection(this.COLLECTION_NAME).doc(userId);
+      await userRef.update({
+        skills: firestore.FieldValue.arrayUnion(skill)
       });
     } catch (error) {
       console.error('Erreur lors de l\'ajout de la compétence:', error);
       throw error;
     }
-  },
+  }
 
-  // Supprimer une compétence
   async removeSkill(userId: string, skillName: string): Promise<void> {
     try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await getDoc(userRef);
+      const userRef = db.collection(this.COLLECTION_NAME).doc(userId);
+      const userDoc = await userRef.get();
       const userData = userDoc.data();
       
       if (!userData) {
@@ -222,28 +214,27 @@ export const userService = {
       
       const updatedSkills = userData.skills.filter((s: Skill) => s.name !== skillName);
       
-      await updateDoc(userRef, {
+      await userRef.update({
         skills: updatedSkills
       });
     } catch (error) {
       console.error('Erreur lors de la suppression de la compétence:', error);
       throw error;
     }
-  },
+  }
 
-  // Ajouter une réalisation au portfolio
   async addPortfolioItem(userId: string, imageUri: string, description: string): Promise<void> {
     try {
       const itemId = uuidv4();
-      const storageRef = ref(storage, `users/${userId}/portfolio/${itemId}.jpg`);
+      const storageRef = storage().ref(`users/${userId}/portfolio/${itemId}.jpg`);
       
       // Upload de l'image
       const response = await fetch(imageUri);
       const blob = await response.blob();
-      await uploadBytes(storageRef, blob);
+      await storageRef.put(blob);
       
       // Récupérer l'URL de l'image
-      const imageUrl = await getDownloadURL(storageRef);
+      const imageUrl = await storageRef.getDownloadURL();
       
       // Créer l'item du portfolio
       const portfolioItem: Portfolio = {
@@ -254,29 +245,28 @@ export const userService = {
       };
       
       // Ajouter au profil utilisateur
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      await updateDoc(userRef, {
-        portfolio: arrayUnion({
+      const userRef = db.collection(this.COLLECTION_NAME).doc(userId);
+      await userRef.update({
+        portfolio: firestore.FieldValue.arrayUnion({
           ...portfolioItem,
-          date: Timestamp.fromDate(portfolioItem.date)
+          date: firestore.FieldValue.serverTimestamp()
         })
       });
     } catch (error) {
       console.error('Erreur lors de l\'ajout de l\'item au portfolio:', error);
       throw error;
     }
-  },
+  }
 
-  // Supprimer une réalisation du portfolio
   async removePortfolioItem(userId: string, itemId: string): Promise<void> {
     try {
       // Supprimer l'image du storage
-      const storageRef = ref(storage, `users/${userId}/portfolio/${itemId}.jpg`);
-      await deleteObject(storageRef);
+      const storageRef = storage().ref(`users/${userId}/portfolio/${itemId}.jpg`);
+      await storageRef.delete();
       
       // Supprimer l'item du profil utilisateur
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await getDoc(userRef);
+      const userRef = db.collection(this.COLLECTION_NAME).doc(userId);
+      const userDoc = await userRef.get();
       const userData = userDoc.data();
       
       if (!userData) {
@@ -285,23 +275,22 @@ export const userService = {
       
       const updatedPortfolio = userData.portfolio.filter((item: Portfolio) => item.id !== itemId);
       
-      await updateDoc(userRef, {
+      await userRef.update({
         portfolio: updatedPortfolio
       });
     } catch (error) {
       console.error('Erreur lors de la suppression de l\'item du portfolio:', error);
       throw error;
     }
-  },
+  }
 
-  // Mettre à jour la note d'un utilisateur
   async updateRating(userId: string, newRating: number): Promise<void> {
     try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
+      const userRef = db.collection(this.COLLECTION_NAME).doc(userId);
       
-      await runTransaction(db, async (transaction) => {
+      await db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
+        if (!userDoc.exists) {
           throw new Error('Utilisateur non trouvé');
         }
 
@@ -321,5 +310,7 @@ export const userService = {
       console.error('Erreur lors de la mise à jour de la note:', error);
       throw error;
     }
-  },
-};
+  }
+}
+
+export const userService = new UserService();

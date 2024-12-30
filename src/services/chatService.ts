@@ -1,4 +1,4 @@
-import { db, storage } from '../config/firebase';
+import { db, firestore, storage } from '../config/firebase';
 import {
   collection,
   query,
@@ -18,11 +18,15 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Message, Conversation, CreateMessageData, CreateConversationData } from '../types/chat';
 
 class ChatService {
+
+  private readonly COLLECTION_NAME = 'conversations';
+  private readonly MESSAGES_COLLECTION = 'messages';
+
   async checkConversationExists(conversationId: string): Promise<boolean> {
     try {
-      const conversationRef = doc(db, 'conversations', conversationId);
-      const docSnap = await getDoc(conversationRef);
-      return docSnap.exists();
+      const conversationRef = db.collection(this.COLLECTION_NAME).doc(conversationId);
+      
+      return conversationRef.get().then(doc => doc.exists);
     } catch (error) {
       console.error('Erreur lors de la vérification de la conversation:', error);
       return false;
@@ -47,14 +51,14 @@ class ChatService {
 
       console.log('📝 Données de la conversation:', conversationData);
 
-      const docRef = await addDoc(collection(db, 'conversations'), conversationData);
+      const docRef = await db.collection(this.COLLECTION_NAME).add(conversationData);
       console.log('✅ Conversation créée avec l\'ID:', docRef.id);
 
       return {
         id: docRef.id,
         ...conversationData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: firestore.Timestamp.now(),
+        updatedAt: firestore.Timestamp.now(),
       } as Conversation;
     } catch (error) {
       console.error('❌ Erreur lors de la création de la conversation:', error);
@@ -64,11 +68,11 @@ class ChatService {
 
   async sendMessage(data: CreateMessageData): Promise<void> {
     try {
-      const batch = writeBatch(db);
+      const batch = db.batch();
 
       // Créer le message
-      const messagesRef = collection(db, 'messages');
-      const messageDoc = doc(messagesRef);
+      const messagesRef = db.collection(this.MESSAGES_COLLECTION);
+      const messageDoc = messagesRef.doc();
       const messageData = {
         id: messageDoc.id,
         ...data,
@@ -80,7 +84,7 @@ class ChatService {
       batch.set(messageDoc, messageData);
 
       // Mettre à jour la conversation
-      const conversationRef = doc(db, 'conversations', data.conversationId);
+      const conversationRef = db.collection(this.COLLECTION_NAME).doc(data.conversationId);
       batch.update(conversationRef, {
         lastMessage: {
           text: data.text,
@@ -100,34 +104,29 @@ class ChatService {
   }
 
   async uploadMedia(file: Blob, path: string): Promise<string> {
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    return getDownloadURL(storageRef);
+    const storageRef = storage().ref(path);
+    await storageRef.put(file);
+    return storageRef.getDownloadURL();
   }
 
   async markMessageAsRead(messageId: string): Promise<void> {
-    const messageRef = doc(db, 'messages', messageId);
-    await updateDoc(messageRef, {
-      read: true,
-      readAt: serverTimestamp(),
-    });
+    const messageRef = db.collection(this.MESSAGES_COLLECTION).doc(messageId);
+    await messageRef.update({ read: true, readAt: serverTimestamp() });
   }
 
   async markConversationAsRead(conversationId: string, userId: string): Promise<void> {
     try {
-      const messagesRef = collection(db, 'messages');
-      const q = query(
-        messagesRef,
-        where('conversationId', '==', conversationId),
-        where('recipientId', '==', userId),
-        where('read', '==', false)
-      );
+      const messagesRef = db.collection(this.MESSAGES_COLLECTION);
+      const q = messagesRef
+        .where('conversationId', '==', conversationId)
+        .where('recipientId', '==', userId)
+        .where('read', '==', false);
 
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await q.get();
       
       if (querySnapshot.empty) return;
 
-      const batch = writeBatch(db);
+      const batch = db.batch();
 
       querySnapshot.forEach((doc) => {
         batch.update(doc.ref, {
@@ -145,16 +144,14 @@ class ChatService {
 
   async markMessagesAsRead(conversationId: string, recipientId: string) {
     try {
-      const messagesRef = collection(db, 'messages');
-      const q = query(
-        messagesRef,
-        where('conversationId', '==', conversationId),
-        where('recipientId', '==', recipientId),
-        where('read', '==', false)
-      );
+      const messagesRef = db.collection(this.MESSAGES_COLLECTION);
+      const q = messagesRef
+        .where('conversationId', '==', conversationId)
+        .where('recipientId', '==', recipientId)
+        .where('read', '==', false);
 
-      const snapshot = await getDocs(q);
-      const batch = writeBatch(db);
+      const snapshot = await q.get();
+      const batch = db.batch();
 
       snapshot.docs.forEach((doc) => {
         batch.update(doc.ref, { read: true });
@@ -167,19 +164,41 @@ class ChatService {
   }
 
   subscribeToMessages(conversationId: string, callback: (messages: Message[]) => void): () => void {
-    const messagesRef = collection(db, 'messages');
-    const q = query(
-      messagesRef,
-      where('conversationId', '==', conversationId),
-      orderBy('createdAt', 'desc')
-    );
+    console.log('🔄 Démarrage de subscribeToMessages pour conversationId:', conversationId);
+    
+    const messagesRef = db.collection(this.MESSAGES_COLLECTION);
+    console.log('🔍 Construction de la requête messages avec:', {
+      collection: this.MESSAGES_COLLECTION,
+      filter: 'conversationId ==',
+      orderBy: 'createdAt asc'
+    });
 
-    return onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Message[];
+    const q = messagesRef
+      .where('conversationId', '==', conversationId)
+      .orderBy('createdAt', 'asc');
+
+    return q.onSnapshot((snapshot) => {
+      console.log(`📨 Réception de ${snapshot.docs.length} messages`);
+      
+      const messages = snapshot.docs.map((doc) => {
+        const messageData = doc.data();
+        console.log(`📝 Message ${doc.id}:`, {
+          senderId: messageData.senderId,
+          type: messageData.type,
+          createdAt: messageData.createdAt,
+          read: messageData.read
+        });
+        
+        return {
+          id: doc.id,
+          ...messageData,
+        } as Message;
+      });
+
+      console.log('✅ Messages traités et envoyés au callback');
       callback(messages);
+    }, (error) => {
+      console.error('❌ Erreur dans le listener de messages:', error);
     });
   }
 
@@ -188,14 +207,13 @@ class ChatService {
     participantIds: string[]
   ): Promise<Conversation | null> {
     try {
-      const conversationsRef = collection(db, 'conversations');
-      const q = query(
-        conversationsRef,
-        where('postId', '==', postId),
-        where('participants', 'array-contains-any', participantIds)
-      );
+      const conversationsRef = db.collection(this.COLLECTION_NAME);
+      const q = conversationsRef
+      where('postId', '==', postId),
+      where('participants', 'array-contains-any', participantIds)
+      orderBy('updatedAt', 'desc');
 
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await q.get();
       const conversations = querySnapshot.docs
         .map((doc) => ({
           id: doc.id,
@@ -215,14 +233,12 @@ class ChatService {
   }
 
   async getUnreadCount(userId: string): Promise<number> {
-    const messagesRef = collection(db, 'messages');
-    const q = query(
-      messagesRef,
-      where('recipientId', '==', userId),
-      where('read', '==', false)
-    );
+    const messagesRef = db.collection(this.MESSAGES_COLLECTION);
+    const q = messagesRef
+      .where('recipientId', '==', userId)
+      .where('read', '==', false);
 
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await q.get();
     return querySnapshot.size;
   }
 
@@ -234,13 +250,6 @@ class ChatService {
       id: userId,
       displayName,
     };
-    
-    const conversationsRef = collection(db, 'conversations');
-    const q = query(
-      conversationsRef,
-      where('participants', 'array-contains', participantQuery),
-      orderBy('updatedAt', 'desc')
-    );
 
     console.log('📝 Query construite:', JSON.stringify({
       collection: 'conversations',
@@ -250,88 +259,80 @@ class ChatService {
       }
     }, null, 2));
 
-    return onSnapshot(q, (snapshot) => {
-      console.log(`📥 Snapshot reçu avec ${snapshot.docs.length} documents`);
-      
-      if (snapshot.empty) {
-        console.log('ℹ️ Aucune conversation trouvée');
-        callback([]);
-        return;
-      }
-
-      snapshot.docChanges().forEach(change => {
-        console.log(`🔄 Document ${change.doc.id} a été ${change.type}`);
-        console.log('Document data:', change.doc.data());
-      });
-
-      const conversations = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        console.log('📄 Document data:', JSON.stringify({
+    return db.collection(this.COLLECTION_NAME)
+      .where('participants', 'array-contains', participantQuery)
+      .orderBy('updatedAt', 'desc')
+      .onSnapshot((snapshot) => {
+        const conversations = snapshot.docs.map((doc) => ({
           id: doc.id,
-          participants: data.participants,
-          lastMessage: data.lastMessage,
-          postId: data.postId,
-          timestamps: {
-            createdAt: data.createdAt,
-            updatedAt: data.updatedAt
-          }
-        }, null, 2));
-
-        return {
-          id: doc.id,
-          participants: data.participants,
-          lastMessage: data.lastMessage ? {
-            ...data.lastMessage,
-            createdAt: data.lastMessage.createdAt?.toDate() || new Date()
-          } : null,
-          postId: data.postId,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date()
-        } as Conversation;
+          ...doc.data(),
+        })) as Conversation[];
+        callback(conversations);
       });
-
-      console.log(`✅ ${conversations.length} conversations transformées et envoyées au callback`);
-      callback(conversations);
-    }, (error) => {
-      console.error('❌ Erreur lors de l\'écoute des conversations:', error);
-    });
   }
 
   subscribeToTotalUnreadCount(userId: string, callback: (count: number) => void): () => void {
-    const messagesRef = collection(db, 'messages');
-    const q = query(
-      messagesRef,
-      where('recipientId', '==', userId),
-      where('read', '==', false)
-    );
-
-    return onSnapshot(q, (snapshot) => {
-      callback(snapshot.size);
-    });
+    return db.collection(this.MESSAGES_COLLECTION)
+      .where('recipientId', '==', userId)
+      .where('read', '==', false)
+      .onSnapshot((snapshot) => {
+        const count = snapshot.size;
+        callback(count);
+      });
   }
 
-  async getUserConversations(userId: string): Promise<Conversation[]> {
-    const conversationsRef = collection(db, 'conversations');
-    const q = query(
-      conversationsRef,
-      where('participants', 'array-contains', { id: userId }),
-      orderBy('updatedAt', 'desc')
-    );
+  async getUserConversations(userId: string, displayName: string, avatar: string): Promise<Conversation[]> {
+    console.log('📱 Démarrage de getUserConversations pour userId:', userId);
+    
+    try {
+      const conversationsRef = db.collection(this.COLLECTION_NAME);
+      console.log('🔍 Construction de la requête avec:', {
+        collection: this.COLLECTION_NAME,
+        filter: 'participants array-contains',
+        participant: { id: userId },
+        orderBy: 'updatedAt desc'
+      });
 
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        lastMessage: data.lastMessage ? {
-          ...data.lastMessage,
-          createdAt: data.lastMessage.createdAt?.toDate() || new Date(),
-        } : null,
-      } as Conversation;
-    });
+      const q = conversationsRef
+        .where('participants', 'array-contains', { 
+          id: userId,
+          displayName,
+          avatar
+        })
+        .orderBy('updatedAt', 'desc');
+
+      console.log('⏳ Exécution de la requête...');
+      const querySnapshot = await q.get();
+      console.log(`✅ ${querySnapshot.size} conversations trouvées`);
+
+      const conversations = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        console.log(`📝 Traitement de la conversation ${doc.id}:`, {
+          participants: data.participants,
+          lastMessage: data.lastMessage ? {
+            text: data.lastMessage.text,
+            createdAt: data.lastMessage.createdAt
+          } : null
+        });
+
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+          lastMessage: data.lastMessage ? {
+            ...data.lastMessage,
+            createdAt: data.lastMessage.createdAt?.toDate() || new Date(),
+          } : null,
+        } as Conversation;
+      });
+
+      console.log('✅ Conversations traitées et formatées avec succès');
+      return conversations;
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des conversations:', error);
+      throw error;
+    }
   }
 }
 

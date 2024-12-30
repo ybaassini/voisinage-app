@@ -7,6 +7,7 @@ interface ChatContextType {
   conversations: Conversation[];
   loading: boolean;
   error: string | null;
+  loadConversations: () => Promise<void>;
   refreshConversations: () => Promise<void>;
   sendMessage: (conversationId: string, text: string) => Promise<void>;
   markAsRead: (conversationId: string) => Promise<void>;
@@ -15,34 +16,37 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuthContext();
+  const { user, userProfile } = useAuthContext();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadConversations = async () => {
+    console.log('🔄 ChatContext: Démarrage du chargement des conversations');
+    
     if (!user?.uid) {
+      console.log('❌ ChatContext: Pas d\'utilisateur connecté, réinitialisation des conversations');
       setConversations([]);
-      setLoading(false);
       return;
     }
 
     try {
+      console.log('⏳ ChatContext: Début du chargement pour userId:', user.uid);
       setLoading(true);
       setError(null);
-      const userConversations = await chatService.getUserConversations(user.uid);
+      
+      const userConversations = await chatService.getUserConversations(user.uid, userProfile.displayName, userProfile.avatar);
+      console.log(`✅ ChatContext: ${userConversations.length} conversations chargées`);
+      
       setConversations(userConversations);
     } catch (err) {
-      console.error('Erreur lors du chargement des conversations:', err);
+      console.error('❌ ChatContext: Erreur lors du chargement des conversations:', err);
       setError('Impossible de charger les conversations');
     } finally {
       setLoading(false);
+      console.log('🏁 ChatContext: Fin du processus de chargement');
     }
   };
-
-  useEffect(() => {
-    loadConversations();
-  }, [user?.uid]);
 
   const refreshConversations = async () => {
     await loadConversations();
@@ -83,6 +87,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         conversations,
         loading,
         error,
+        loadConversations,
         refreshConversations,
         sendMessage,
         markAsRead,

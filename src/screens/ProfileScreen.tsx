@@ -8,13 +8,16 @@ import { userService } from '../services/userService';
 import { UserProfile } from '../types/user';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { theme } from '../theme/theme';
+import { formatRelativeTime } from '../utils/dateUtils';
+import UserPostsList from '../components/UserPostsList';
+import { postService } from '../services/postService';
+import { Post } from '../types/post';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type TabType = 'accueil' | 'photos' | 'avis';
+type TabType = 'accueil' | 'photos' | 'avis' | 'posts';
 
 const ProfileScreen = () => {
   const theme = useTheme();
@@ -25,6 +28,8 @@ const ProfileScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('accueil');
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   // Récupérer l'userId des paramètres de route s'il existe
   const userId = route.params?.userId;
@@ -65,6 +70,26 @@ const ProfileScreen = () => {
   }, [userId, userProfile, isCurrentUser]);
 
   useEffect(() => {
+    if (activeTab === 'posts' && userId) {
+      fetchUserPosts();
+    }
+  }, [activeTab, userId]);
+
+  const fetchUserPosts = async () => {
+    if (!userId) return;
+    
+    try {
+      setLoadingPosts(true);
+      const posts = await postService.getUserPosts(userId);
+      setUserPosts(posts);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des posts:', error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <IconButton
@@ -96,10 +121,7 @@ const ProfileScreen = () => {
     );
   }
 
-  const memberSince = formatDistanceToNow(
-    new Date(profileData.createdAt),
-    { addSuffix: true, locale: fr }
-  );
+  const memberSince = formatRelativeTime(profileData.createdAt);
 
   const renderHeader = () => (
     <Animated.View
@@ -142,21 +164,6 @@ const ProfileScreen = () => {
           <Text style={[styles.memberSince, { color: theme.colors.onSurfaceVariant }]}>
             Membre {memberSince}
           </Text>
-
-          {!isCurrentUser && (
-            <Button
-              mode="contained"
-              icon="message"
-              style={styles.messageButton}
-              onPress={() => navigation.navigate('Chat', {
-                conversationId: null,
-                recipient: profileData,
-                postId: null
-              })}
-            >
-              Envoyer un message
-            </Button>
-          )}
         </View>
       </Surface>
     </Animated.View>
@@ -207,6 +214,21 @@ const ProfileScreen = () => {
           { color: activeTab === 'avis' ? theme.colors.primary : theme.colors.onSurfaceVariant }
         ]}>
           Avis
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'posts' && styles.activeTab,
+          { borderBottomColor: theme.colors.primary }
+        ]}
+        onPress={() => setActiveTab('posts')}
+      >
+        <Text style={[
+          styles.tabText,
+          { color: activeTab === 'posts' ? theme.colors.primary : theme.colors.onSurfaceVariant }
+        ]}>
+          Demandes
         </Text>
       </TouchableOpacity>
     </Surface>
@@ -371,7 +393,7 @@ const ProfileScreen = () => {
                           {review.reviewer.firstName} {review.reviewer.lastName}
                         </Text>
                         <Text style={styles.reviewDate}>
-                          {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true, locale: fr })}
+                          {formatRelativeTime(review.createdAt)}
                         </Text>
                       </View>
                       <View style={styles.reviewRating}>
@@ -394,6 +416,14 @@ const ProfileScreen = () => {
     );
   };
 
+  const renderPostsContent = () => (
+    <UserPostsList
+      posts={userPosts}
+      loading={loadingPosts}
+      onRefresh={fetchUserPosts}
+    />
+  );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'accueil':
@@ -402,6 +432,8 @@ const ProfileScreen = () => {
         return renderPhotosContent();
       case 'avis':
         return renderAvisContent();
+      case 'posts':
+        return renderPostsContent();
       default:
         return null;
     }
