@@ -31,7 +31,7 @@ export interface Post {
   description: string;
   
   /** Catégorie du post */
-  category: string;
+  category: Category;
   
   /** URLs des photos associées (optionnel) */
   photos?: string[];
@@ -73,7 +73,7 @@ export interface CreatePostData {
   description: string;
   
   /** Catégorie du post */
-  category: string;
+  category: Category;
   
   /** Fichiers photos à uploader (optionnel) */
   photos?: File[];
@@ -83,4 +83,26 @@ export interface CreatePostData {
   
   /** Localisation du post */
   location: Location;
+}
+
+/** Interface pour la catégorie d'un post */
+export interface Category {
+  /** ID de la catégorie */
+  id: string;
+  
+  /** Nom de la catégorie */
+  name: string;
+
+  /** Sous-catégories de la catégorie */
+  subcategory: SubCategory;
+
+}
+
+/** Interface pour la sous catégorie d'un post */
+export interface SubCategory {
+  /** ID de la sous catégorie */
+  id: string;
+  
+  /** Nom de la sous catégorie */
+  name: string;
 }

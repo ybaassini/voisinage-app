@@ -3,7 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Platform, View, StyleSheet, Text } from 'react-native';
+import { Platform, View, StyleSheet } from 'react-native';
+import { Text } from 'react-native-paper';
 
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -32,6 +33,7 @@ const MainStack = () => {
         headerShadowVisible: false,
         headerTitleStyle: {
           fontWeight: '600',
+          color: theme.colors.onPrimary
         },
         headerTintColor: theme.colors.onSurface,
       }}
@@ -53,8 +55,9 @@ const MainStack = () => {
           headerShadowVisible: false,
           headerTitleStyle: {
             fontWeight: '600',
+            color: theme.colors.onPrimary
           },
-          headerTintColor: theme.colors.onSurface,
+          headerTintColor: theme.colors.onPrimary,
         }}
       />
       <Stack.Screen 
@@ -69,6 +72,7 @@ const MainStack = () => {
           headerShadowVisible: false,
           headerTitleStyle: {
             fontWeight: '600',
+            color: theme.colors.onPrimary
           },
           headerTintColor: theme.colors.onSurface,
         }}
@@ -85,6 +89,7 @@ const MainStack = () => {
           headerShadowVisible: false,
           headerTitleStyle: {
             fontWeight: '600',
+            color: theme.colors.onPrimary
           },
           headerTintColor: theme.colors.onSurface,
         }}
@@ -101,6 +106,7 @@ const MainStack = () => {
           headerShadowVisible: false,
           headerTitleStyle: {
             fontWeight: '600',
+            color: theme.colors.onPrimary
           },
           headerTintColor: theme.colors.onSurface,
         }}
@@ -182,10 +188,11 @@ const MainTabs = () => {
           name="Home"
           component={HomeScreen}
           options={{
-            headerTitle: () => <Logo />,
+            headerTitle: () => <Text variant="headlineLarge" style={styles.headerTitle}>Jirani</Text>,
             tabBarIcon: ({ color, size }) => (
               <TabIcon name="home" size={size} color={color} />
-            )
+            ),
+            headerTintColor: theme.colors.onPrimary,
           }}
         />
         <Tab.Screen
@@ -193,6 +200,16 @@ const MainTabs = () => {
           component={NotificationsScreen}
           options={{
             title: 'Notifications',
+            headerStyle: {
+              backgroundColor: theme.colors.background,
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
+            },
+            headerTitleStyle: {
+              fontWeight: '600',
+              color: theme.colors.onPrimary
+            },
             tabBarIcon: ({ color, size }) => (
               <TabIcon 
                 name="bell" 
@@ -238,6 +255,10 @@ const MainTabs = () => {
           component={ConversationsScreen}
           options={{
             title: 'Messages',
+            headerTitleStyle: {
+              fontWeight: '600',
+              color: theme.colors.onPrimary
+            },
             tabBarIcon: ({ color, size }) => (
               <TabIcon 
                 name="message" 
@@ -253,6 +274,10 @@ const MainTabs = () => {
           component={ProfileScreen}
           options={{
             title: 'Profil',
+            headerTitleStyle: {
+              fontWeight: '600',
+              color: theme.colors.onPrimary
+            },
             tabBarIcon: ({ color, size }) => (
               <TabIcon name="account" size={size} color={color} />
             ),
@@ -289,6 +314,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+  },
+  headerTitle: {
+    fontWeight: '600',
+    color: theme.colors.onPrimary
   },
   badgeText: {
     color: '#FFFFFF',

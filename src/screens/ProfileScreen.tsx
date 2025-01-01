@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, Avatar, useTheme, Button, Surface, Chip, IconButton, Image } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, Image } from 'react-native';
+import { Text, Avatar, useTheme, Button, Surface, IconButton, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import CustomChip from '../components/CustomChip';
+import ImageViewerModal from '../components/ImageViewerModal';
 
 import { useAuth } from '../hooks/useAuth';
 import { userService } from '../services/userService';
+import { storageService } from '../services/storageService';
 import { UserProfile } from '../types/user';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -30,6 +34,11 @@ const ProfileScreen = () => {
   const [activeTab, setActiveTab] = useState<TabType>('accueil');
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<TabType>('posts');
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Récupérer l'userId des paramètres de route s'il existe
   const userId = route.params?.userId;
@@ -101,6 +110,66 @@ const ProfileScreen = () => {
       ),
     });
   }, [navigation, theme.colors]);
+
+  const pickImage = async () => {
+    try {
+      // Demander la permission d'accès à la galerie
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission refusée',
+          'Nous avons besoin de votre permission pour accéder à vos photos.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        allowsMultipleSelection: false,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setUploadingImage(true);
+        const imageUri = result.assets[0].uri;
+        
+        // Générer un nom de fichier unique
+        const fileName = storageService.generateUniqueFileName(imageUri);
+        const storagePath = `users/${userProfile.id}/portfolio/${fileName}`;
+        
+        try {
+          // Upload l'image
+          const downloadURL = await storageService.uploadImage(imageUri, storagePath);
+          
+          // Ajouter l'URL au portfolio de l'utilisateur
+          await userService.addToPortfolio(userProfile.id, downloadURL);
+          
+          // Mettre à jour l'état local
+          const updatedProfile = {
+            ...profileData,
+            portfolio: [
+              ...(profileData.portfolio || []),
+              { url: downloadURL, createdAt: new Date() }
+            ]
+          };
+          setProfileData(updatedProfile);
+          
+          Alert.alert('Succès', 'La photo a été ajoutée à votre portfolio');
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          Alert.alert('Erreur', 'Une erreur est survenue lors de l\'upload de l\'image');
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la sélection de l\'image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -265,17 +334,13 @@ const ProfileScreen = () => {
           <View style={styles.skillsContainer}>
             {profileData.skills && profileData.skills.length > 0 ? (
               profileData.skills.map((skill, index) => (
-                <Chip
-                icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
-                mode="flat"
-                key={index}
-                style={[styles.categoryChip, { 
-                  backgroundColor: theme.colors.background,
-                  color: theme.colors.secondary 
-                }]}
-              >
-                {skill.name}
-              </Chip>
+                <CustomChip
+                  key={index}
+                  icon="tag"
+                  text={skill.name}
+                  variant="primary"
+                  size="medium"
+                />
               ))
             ) : (
               <Text style={{ color: theme.colors.onSurfaceVariant }}>
@@ -311,25 +376,61 @@ const ProfileScreen = () => {
         <View style={styles.sectionHeader}>
           <MaterialCommunityIcons name="image-multiple" size={24} color={theme.colors.primary} />
           <Text variant="titleMedium" style={styles.sectionTitle}>Portfolio</Text>
+          <TouchableOpacity
+            style={[
+              styles.addPhotoButton,
+              uploadingImage && styles.addPhotoButtonDisabled
+            ]}
+            onPress={pickImage}
+            disabled={uploadingImage}
+          >
+            {uploadingImage ? (
+              <ActivityIndicator size={24} color={theme.colors.primary} />
+            ) : (
+              <MaterialCommunityIcons name="camera-plus" size={24} color={theme.colors.primary} />
+            )}
+          </TouchableOpacity>
         </View>
+        
         <View style={styles.photosGrid}>
           {profileData.portfolio && profileData.portfolio.length > 0 ? (
             profileData.portfolio.map((photo, index) => (
-              <View key={index} style={styles.photoContainer}>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.photoContainer}
+                onPress={() => {
+                  setSelectedImageIndex(index);
+                  setImageViewerVisible(true);
+                }}
+              >
                 <Image
                   source={{ uri: photo.url }}
                   style={styles.photo}
                   resizeMode="cover"
                 />
-              </View>
+              </TouchableOpacity>
             ))
           ) : (
-            <Text style={{ color: theme.colors.onSurfaceVariant }}>
-              Aucune photo dans le portfolio
-            </Text>
+            <View style={styles.emptyPortfolio}>
+              <MaterialCommunityIcons 
+                name="image-plus" 
+                size={48} 
+                color={theme.colors.onSurfaceVariant} 
+              />
+              <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
+                Ajoutez des photos à votre portfolio
+              </Text>
+            </View>
           )}
         </View>
       </Surface>
+
+      <ImageViewerModal
+        visible={imageViewerVisible}
+        images={profileData.portfolio?.map(p => p.url) || []}
+        initialIndex={selectedImageIndex}
+        onClose={() => setImageViewerVisible(false)}
+      />
     </Animated.View>
   );
 
@@ -546,6 +647,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   sectionTitle: {
     marginLeft: 8,
@@ -569,17 +672,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    padding: 16,
   },
   photoContainer: {
-    width: (SCREEN_WIDTH - 48) / 2,
+    width: '48%',
     aspectRatio: 1,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: theme.colors.surface,
   },
   photo: {
     width: '100%',
     height: '100%',
+  },
+  emptyPortfolio: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  addPhotoButton: {
+    marginLeft: 'auto',
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surfaceVariant,
+  },
+  addPhotoButtonDisabled: {
+    opacity: 0.5,
   },
   reviewsContainer: {
     gap: 16,

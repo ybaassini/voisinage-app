@@ -9,7 +9,7 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { Text, Avatar, Card, Button, IconButton, useTheme, Surface, Chip,  } from 'react-native-paper';
+import { Text, Avatar, Card, Button, IconButton, useTheme, Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   FadeInDown,
@@ -26,6 +26,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import TimeAgo from '../components/TimeAgo';
 import ImageViewerModal from '../components/ImageViewerModal';
+import CustomChip from '../components/CustomChip';
 import { Post } from '../types/post';
 import { postService } from '../services/postService';
 import { useRequireAuth } from '../hooks/useRequireAuth';
@@ -187,9 +188,9 @@ const PostDetailScreen = () => {
           <MaterialCommunityIcons
             name="message-processing-outline"
             size={24}
-            color={theme.colors.onSurfaceVariant}
+            color={theme.colors.onPrimary}
           />
-          <Text style={[styles.loadingText, { color: theme.colors.onSurfaceVariant }]}>
+          <Text style={[styles.loadingText, { color: theme.colors.onPrimary }]}>
             Chargement des réponses...
           </Text>
         </View>
@@ -205,12 +206,12 @@ const PostDetailScreen = () => {
           <MaterialCommunityIcons
             name="message-text-outline"
             size={48}
-            color={theme.colors.onSurfaceVariant}
+            color={theme.colors.onPrimary}
           />
-          <Text style={[styles.noResponsesText, { color: theme.colors.onSurfaceVariant }]}>
+          <Text style={[styles.noResponsesText, { color: theme.colors.onPrimary }]}>
             Aucune réponse pour le moment
           </Text>
-          <Text style={[styles.noResponsesSubtext, { color: theme.colors.onSurfaceVariant }]}>
+          <Text style={[styles.noResponsesSubtext, { color: theme.colors.onPrimary }]}>
             Soyez le premier à répondre à cette demande
           </Text>
         </Animated.View>
@@ -226,7 +227,7 @@ const PostDetailScreen = () => {
             color={theme.colors.primary}
             style={styles.responseIcon}
           />
-          <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.onPrimary }]}>
             Réponses ({responses.length})
           </Text>
         </View>
@@ -319,27 +320,20 @@ const PostDetailScreen = () => {
               </TouchableOpacity>
               <View style={styles.userInfoText}>
                 <Text variant="titleMedium" style={styles.userName}>
-                  {post.requestor?.displayName || 'Utilisateur'}
+                  {post.requestor?.firstName || 'Utilisateur'}
                 </Text>
                 <View style={styles.locationInfo}>
                   <MaterialCommunityIcons
                     name="map-marker"
                     size={14}
-                    color={theme.colors.onSurfaceVariant}
+                    color={theme.colors.onPrimary}
                   />
-                  <Text 
-                    variant="bodySmall" 
-                    style={[styles.locationText, { color: theme.colors.onSurfaceVariant }]}
-                    numberOfLines={1}
-                  >
-                    {post.location?.address || 'Adresse non spécifiée'}
-                  </Text>
                   {typeof post.distance === 'number' && (
                     <Text 
                       variant="bodySmall" 
-                      style={[styles.distanceText, { color: theme.colors.onSurfaceVariant }]}
+                      style={[styles.distanceText, { color: theme.colors.onPrimary }]}
                     >
-                      • {post.distance.toFixed(1)} km
+                      {post.distance.toFixed(1)} km
                     </Text>
                   )}
                 </View>
@@ -354,7 +348,7 @@ const PostDetailScreen = () => {
             
             <Text 
               variant="bodyLarge" 
-              style={[styles.description, { color: theme.colors.onSurfaceVariant }]}
+              style={[styles.description, { color: theme.colors.onPrimary }]}
               numberOfLines={showFullDescription ? undefined : 3}
             >
               {post.description}
@@ -403,16 +397,12 @@ const PostDetailScreen = () => {
             entering={FadeInDown.delay(400)}
             style={styles.metadata}
           >
-            <Chip
-              icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
-              mode="flat"
-              style={[styles.categoryChip, {
-                backgroundColor: theme.colors.background,
-                color: theme.colors.secondary
-              }]}
-            >
-              {post.category}
-            </Chip>
+            <CustomChip
+              icon="tag"
+              text={post.category}
+              variant="primary"
+              size="medium"
+            />
           </Animated.View>
 
           {renderResponses()}
@@ -434,7 +424,7 @@ const PostDetailScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -459,6 +449,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontWeight: '600',
+    color: theme.colors.onPrimary,
   },
   locationInfo: {
     flexDirection: 'row',
@@ -479,6 +470,7 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: 12,
     fontWeight: '600',
+    color: theme.colors.onPrimary,
   },
   description: {
     lineHeight: 24,

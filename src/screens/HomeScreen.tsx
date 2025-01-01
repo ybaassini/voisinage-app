@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 
-import { Text, Card, Chip, useTheme, IconButton, Avatar, ActivityIndicator } from 'react-native-paper';
+import { Text, Card, useTheme, IconButton, Avatar, ActivityIndicator } from 'react-native-paper';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import TimeAgo from '../components/TimeAgo';
@@ -10,6 +10,8 @@ import { Post } from '../types/post';
 import { useAuth } from '../hooks/useAuth';
 import { theme } from '../theme/theme';
 import { convertToDate, formatRelativeTime } from '../utils/dateUtils';
+import CategoryFilter from '../components/CategoryFilter';
+import CustomChip from '../components/CustomChip';
 
 const HomeScreen = ({ navigation }: any) => {
   const theme = useTheme();
@@ -20,6 +22,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [error, setError] = useState<string | null>(null);
   const [postSheetVisible, setPostSheetVisible] = useState(false);
   const [searchRadius, setSearchRadius] = useState(10); // Rayon de recherche en km
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const { userProfile } = useAuth();
 
@@ -40,14 +43,19 @@ const HomeScreen = ({ navigation }: any) => {
         );
       }
 
-      setPosts(fetchedPosts);
+      // Filtrer les posts par catégorie si une catégorie est sélectionnée
+      const filteredPosts = selectedCategory === 'all'
+        ? fetchedPosts
+        : fetchedPosts.filter(post => post.category.id === selectedCategory);
+
+      setPosts(filteredPosts);
     } catch (error) {
       console.error('Erreur lors de la récupération des posts:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userProfile?.location, searchRadius]);
+  }, [userProfile?.location, searchRadius, selectedCategory]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -96,7 +104,7 @@ const HomeScreen = ({ navigation }: any) => {
             {item.distance !== undefined ? (
               <View style={styles.distanceContainer}>
                 <MaterialCommunityIcons
-                  name="map-marker-distance"
+                  name="map-marker"
                   size={14}
                   color={theme.colors.onSurfaceVariant}
                 />
@@ -171,13 +179,12 @@ const HomeScreen = ({ navigation }: any) => {
           <Card.Content style={styles.cardContent}>
             {renderPostHeader({ item })}
 
-            <Chip
-              icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.onPrimary} />}
-              mode="flat"
-              style={[styles.categoryChip, { color: theme.colors.secondary }]}
-            >
-              {item.category}
-            </Chip>
+            <CustomChip
+              icon="tag"
+              text={item.category}
+              variant="primary"
+              size="medium"
+            />
 
             <Text variant="bodyLarge"
               numberOfLines={3}
@@ -211,9 +218,28 @@ const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <CategoryFilter
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+      />
       {loading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : posts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons
+            name="post-outline"
+            size={48}
+            color={theme.colors.onSurfaceVariant}
+          />
+          <Text
+            variant="titleMedium"
+            style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}
+          >
+            Aucune demande pour le moment
+            {selectedCategory !== 'all' && ' dans cette catégorie'}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -228,13 +254,6 @@ const HomeScreen = ({ navigation }: any) => {
               onRefresh={onRefresh}
               colors={[theme.colors.primary]}
             />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                Aucune demande trouvée {userProfile?.location?.coordinates ? `dans un rayon de ${searchRadius}km` : ''}
-              </Text>
-            </View>
           }
         />
       )}
@@ -293,17 +312,6 @@ const styles = StyleSheet.create({
   userInfoText: {
     marginLeft: 12,
   },
-  categoryChip: {
-    backgroundColor: theme.colors.secondary,
-    color: theme.colors.onPrimary,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 24,
-    marginBottom: 8,
-    elevation: 0,
-    borderWidth: 0,
-  },
   description: {
     marginBottom: 12,
     lineHeight: 20,
@@ -352,10 +360,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 32,
   },
   emptyText: {
-    fontSize: 16,
-    color: theme.colors.onSurfaceVariant,
+    marginTop: 16,
+    textAlign: 'center',
   },
   distanceContainer: {
     flexDirection: 'row',

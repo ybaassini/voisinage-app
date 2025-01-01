@@ -3,6 +3,7 @@ import { Post, CreatePostData } from '../types/post';
 import { PostResponse } from '../types/responses';
 import { distanceBetween, geohashForLocation, geohashQueryBounds } from 'geofire-common';
 import { geocodingService } from './geocodingService';
+import { storageService } from './storageService';
 
 class PostService {
   private readonly COLLECTION_NAME = 'posts';
@@ -250,6 +251,55 @@ class PostService {
       })) as PostResponse[];
     } catch (error) {
       console.error('Error getting post responses:', error);
+      throw error;
+    }
+  }
+
+  async uploadPostPhotos(postId: string, photoUris: string[]): Promise<string[]> {
+    console.log(`[PostService] Début de l'upload des photos pour le post ${postId}`);
+    console.log(`[PostService] Nombre de photos à uploader: ${photoUris.length}`);
+    
+    try {
+      const uploadedPhotos = await Promise.all(
+        photoUris.map(async (photoUri, index) => {
+          console.log(`[PostService] Upload de la photo ${index + 1}/${photoUris.length}`);
+          console.log(`[PostService] URI de la photo: ${photoUri}`);
+          
+          try {
+            const fileName = storageService.generateUniqueFileName(photoUri);
+            console.log(`[PostService] Nom du fichier généré: ${fileName}`);
+            
+            const path = `posts/${postId}/${fileName}`;
+            console.log(`[PostService] Chemin de stockage: ${path}`);
+            
+            const url = await storageService.uploadImage(photoUri, path);
+            console.log(`[PostService] Photo ${index + 1} uploadée avec succès`);
+            console.log(`[PostService] URL de la photo: ${url}`);
+            
+            return url;
+          } catch (error) {
+            console.error(`[PostService] Erreur lors de l'upload de la photo ${index + 1}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filtrer les photos qui n'ont pas pu être uploadées
+      const successfullyUploadedPhotos = uploadedPhotos.filter((url): url is string => url !== null);
+      console.log(`[PostService] Nombre de photos uploadées avec succès: ${successfullyUploadedPhotos.length}/${photoUris.length}`);
+
+      if (successfullyUploadedPhotos.length > 0) {
+        console.log(`[PostService] Mise à jour du post avec les URLs des photos`);
+        // Mettre à jour le document du post avec les URLs des photos
+        await this.updatePost(postId, {
+          photos: successfullyUploadedPhotos
+        });
+        console.log(`[PostService] Post mis à jour avec succès`);
+      }
+
+      return successfullyUploadedPhotos;
+    } catch (error) {
+      console.error('[PostService] Erreur lors du processus d\'upload des photos:', error);
       throw error;
     }
   }

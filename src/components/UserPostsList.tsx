@@ -6,10 +6,11 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { Text, Surface, useTheme, Avatar, Chip } from 'react-native-paper';
+import { Text, Surface, useTheme, Avatar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Post } from '../types/post';
 import TimeAgo from './TimeAgo';
+import CustomChip from './CustomChip';
 import { useNavigation } from '@react-navigation/native';
 import { convertToDate } from '../utils/dateUtils';
 
@@ -34,33 +35,22 @@ const UserPostsList: React.FC<UserPostsListProps> = ({
       <Surface style={styles.postCard} elevation={1}>
         <View style={styles.postHeader}>
           <View style={styles.postMeta}>
-            <Chip
-              icon={() => (
-                <MaterialCommunityIcons
-                  name="tag"
-                  size={16}
-                  color={theme.colors.secondary}
-                />
-              )}
-              mode="flat"
-              style={[styles.categoryChip, { backgroundColor: theme.colors.surfaceVariant }]}
-            >
-              {post.category}
-            </Chip>
+            <CustomChip
+              icon="tag"
+              text={post.category}
+              variant="secondary"
+              size="small"
+            />
             <View style={styles.timeContainer}>
               <TimeAgo date={convertToDate(post.createdAt)} />
             </View>
           </View>
           <View style={styles.statusContainer}>
-            <Chip
-              mode="flat"
-              style={[
-                styles.statusChip,
-                { backgroundColor: post.status === 'active' ? theme.colors.primaryContainer : theme.colors.surfaceVariant }
-              ]}
-            >
-              {post.status === 'active' ? 'Active' : 'Terminée'}
-            </Chip>
+            <CustomChip
+              text={post.status === 'active' ? 'Active' : 'Terminée'}
+              variant={post.status === 'active' ? 'primary' : 'outline'}
+              size="small"
+            />
           </View>
         </View>
 
@@ -171,18 +161,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  categoryChip: {
-    marginRight: 8,
-  },
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   statusContainer: {
     alignItems: 'flex-end',
-  },
-  statusChip: {
-    borderRadius: 12,
   },
   title: {
     marginBottom: 8,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, TextInput } from 'react-native';
-import { Text, useTheme, Menu, Divider, Portal, Modal, Chip } from 'react-native-paper';
+import { Text, useTheme, Menu, Divider, Portal, Modal, Chip, ActivityIndicator } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -17,6 +17,7 @@ import CustomButton from '../components/forms/CustomButton';
 import CategorySelectionScreen from './CategorySelectionScreen';
 import { Alert } from 'react-native';
 import AddressAutocompleteInput from '../components/forms/AddressAutocompleteInput';
+import { storageService } from '../services/storageService';
 
 interface NewPostScreenProps {
   isBottomSheet?: boolean;
@@ -29,6 +30,7 @@ interface NewPostFormData {
   title: string;
   description: string;
   category: string;
+  subcategory: string;
   address: string;
   budget: string;
   images: string[];
@@ -72,7 +74,8 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
     if (!selectedCategory) return;
     
     setSelectedSubcategory(subcategory);
-    form.setValue('category', `${selectedCategory.id}_${subcategory.id}`);
+    form.setValue('category', `${selectedCategory.id}`);
+    form.setValue('subcategory', `${subcategory.id}`);
     setShowCategorySelection(false);
   };
 
@@ -88,12 +91,27 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
       setLoading(true);
       const formData = form.getValues();
 
-      await postService.createPost(user.uid,{
+      const category = {
+        id: formData.category,
+        name: SERVICE_CATEGORIES.find(cat => cat.id === formData.category)?.label,
+        subcategory: {
+          id: formData.subcategory,
+          name: SERVICE_CATEGORIES.find(cat => cat.id === formData.category)?.subcategories?.find(sub => sub.id === formData.subcategory)?.label
+        }
+      };
+
+      if (!category) {
+        Alert.alert('Erreur', 'Catégorie invalide');
+        return;
+      }
+
+      // 1. Créer d'abord le post sans les photos
+      const postId = await postService.createPost(user.uid, {
         type: 'request',
         title: formData.title,
         description: formData.description,
-        category: formData.category,
-        photos,
+        category,
+        photos: [], // On commence avec un tableau vide
         requestor: userProfile,
         status: 'active',
         location: {
@@ -102,27 +120,72 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
         budget: formData.budget,
       });
 
+      // 2. Si des photos ont été sélectionnées, les uploader
+      if (photos.length > 0) {
+        try {
+          await postService.uploadPostPhotos(postId, photos);
+        } catch (error) {
+          console.error('Error uploading photos:', error);
+          Alert.alert(
+            'Attention',
+            'La demande a été créée mais certaines photos n\'ont pas pu être uploadées. Vous pourrez les ajouter plus tard.'
+          );
+        }
+      }
+
       form.reset();
       setPhotos([]);
       onDismiss?.();
     } catch (error) {
-      logger.error('Error creating post:', error);
-      alert('Une erreur est survenue lors de la création du post');
+      console.error('Error creating post:', error);
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de la création de la demande. Veuillez réessayer.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+    try {
+      // Demander la permission d'accès à la galerie
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission refusée',
+          'Nous avons besoin de votre permission pour accéder à vos photos.'
+        );
+        return;
+      }
 
-    if (!result.canceled && result.assets[0]) {
-      setPhotos([...photos, result.assets[0].uri]);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: 5,
+      });
+
+      if (!result.canceled && result.assets) {
+        // Vérifier la limite de photos
+        if (photos.length + result.assets.length > 5) {
+          Alert.alert(
+            'Limite atteinte',
+            'Vous ne pouvez pas ajouter plus de 5 photos par demande.'
+          );
+          return;
+        }
+
+        setPhotos([...photos, ...result.assets.map(asset => asset.uri)]);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de la sélection des photos.'
+      );
     }
   };
 
@@ -154,7 +217,7 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
       style={[styles.container, isBottomSheet && { backgroundColor: theme.colors.background }]} 
       contentContainerStyle={styles.contentContainer}
     >
-      <StatusBar barStyle="light-content" />
+      {/* <StatusBar barStyle="light-content" /> */}
       <Text style={[styles.title]}>Nouvelle demande</Text>
 
       <CustomInput
@@ -226,42 +289,39 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
         )}
       </View>
 
-      <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Photos</Text>
-      <View style={styles.photoSection}>
-        {photos.map((photo, index) => (
-          <View key={index} style={styles.photoContainer}>
-            <Image source={{ uri: photo }} style={styles.photo} />
+      <View style={styles.photosSection}>
+        <Text style={[styles.label, { color: theme.colors.onSurface }]}>Photos (max 5)</Text>
+        <View style={styles.photoList}>
+          {photos.map((photo, index) => (
+            <View key={index} style={styles.photoContainer}>
+              <Image source={{ uri: photo }} style={styles.photoPreview} />
+              <TouchableOpacity
+                style={styles.removePhotoButton}
+                onPress={() => removePhoto(index)}
+              >
+                <Icon name="close-circle" size={24} color={theme.colors.error} />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {photos.length < 5 && (
             <TouchableOpacity
-              style={[styles.removeButton, { backgroundColor: theme.colors.error }]}
-              onPress={() => removePhoto(index)}
+              style={[styles.addPhotoButton, { borderColor: theme.colors.primary }]}
+              onPress={pickImage}
             >
-              <Icon name="close" size={16} color="white" />
+              <Icon name="camera-plus" size={32} color={theme.colors.primary} />
             </TouchableOpacity>
-          </View>
-        ))}
-        {photos.length < 3 && (
-          <TouchableOpacity
-            style={[styles.addPhotoButton, { borderColor: theme.colors.primary }]}
-            onPress={pickImage}
-          >
-            <Icon name="camera-plus" size={24} color={theme.colors.primary} />
-          </TouchableOpacity>
-        )}
+          )}
+        </View>
       </View>
 
       <CustomButton
         mode="contained"
         onPress={handlePost}
         loading={loading}
-        disabled={!isFormValid()}
-        style={[
-          styles.submitButton,
-          !isFormValid() && styles.disabledButton
-        ]}
-        labelStyle={!isFormValid() ? styles.disabledButtonText : undefined}
-        icon="send"
+        disabled={loading || !isFormValid()}
+        style={styles.submitButton}
       >
-        Publier
+        {loading ? 'Publication en cours...' : 'Publier la demande'}
       </CustomButton>
     </ScrollView>
   );
@@ -270,12 +330,14 @@ const NewPostScreen = ({ isBottomSheet, onDismiss, onClose, navigation }: NewPos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    marginTop: 16,
   },
   contentContainer: {
     padding: 16,
     paddingBottom: 32,
   },
   title: {
+    paddingTop: 8,
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
@@ -332,39 +394,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
   },
-  photoSection: {
+  photosSection: {
+    marginTop: 16,
+  },
+  photoList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginTop: 8,
   },
   photoContainer: {
     position: 'relative',
-  },
-  photo: {
     width: 100,
     height: 100,
     borderRadius: 8,
+    overflow: 'hidden',
   },
-  removeButton: {
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  removePhotoButton: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 24,
-    height: 24,
+    top: 4,
+    right: 4,
+    backgroundColor: 'white',
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   addPhotoButton: {
     width: 100,
     height: 100,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 2,
     borderStyle: 'dashed',
-    alignItems: 'center',
+    borderRadius: 8,
     justifyContent: 'center',
-    backgroundColor: theme.colors.surfaceVariant,
+    alignItems: 'center',
   },
   submitButton: {
     marginTop: 24,

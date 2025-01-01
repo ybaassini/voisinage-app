@@ -41,5 +41,8 @@ yarn-error.*
 
 # Firebase
 service-account.json
-google-services.json
 firebase-debug.log
+
+# Firebase config files
+google-services.json
+GoogleService-Info.plist

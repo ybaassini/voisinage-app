@@ -6,10 +6,8 @@ export type Skill = {
 };
 
 export type Portfolio = {
-  id: string;
-  imageUrl: string;
-  description: string;
-  date: Date;
+  createdAt: Date;
+  url: string;
 };
 
 export type UserProfile = {

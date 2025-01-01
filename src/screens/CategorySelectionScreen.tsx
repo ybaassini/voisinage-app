@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'reac
 import { Text, useTheme, Surface } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ServiceCategory, ServiceSubcategory, SERVICE_CATEGORIES } from '../constants/serviceCategories';
+import { theme } from '../theme/theme';
 
 interface CategorySelectionScreenProps {
   selectedCategory: ServiceCategory | null;
@@ -40,26 +41,16 @@ const CategorySelectionScreen = ({
             }}
             style={styles.categoryItem}
           >
-            <Surface style={[
-              styles.categoryCard,
-              { backgroundColor: theme.colors.surface }
-            ]}>
-              <View style={[styles.iconWrapper, { backgroundColor: category.background }]}>
-                <Icon 
-                  name={category.icon} 
-                  size={28} 
-                  color={category.color}
-                />
-              </View>
-              <View style={styles.categoryContent}>
-                <Text style={[styles.categoryTitle, { color: theme.colors.onSurface }]} numberOfLines={2}>
-                  {category.label}
-                </Text>
-                <Text style={[styles.categorySubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                  {category.subcategories?.length || 0} sous-catégories
-                </Text>
-              </View>
-            </Surface>
+            <View style={[styles.iconWrapper, { backgroundColor: category.background }]}>
+              <Icon
+                name={category.icon}
+                size={34}
+                color={category.color}
+              />
+              <Text style={[styles.categoryTitle, { color: theme.colors.onSurface }]} numberOfLines={2}>
+                {category.label}
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -92,32 +83,30 @@ const CategorySelectionScreen = ({
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Surface style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            onPress={handleBack}
-            style={styles.backButton}
-          >
-            <Icon
-              name={selectedCategory ? "arrow-left" : "close"}
-              size={24}
-              color={theme.colors.primary}
-            />
-          </TouchableOpacity>
+    <View style={[styles.container]}>
+      <View style={styles.headerContent}>
+        <TouchableOpacity
+          onPress={handleBack}
+          style={styles.backButton}
+        >
+          <Icon
+            name={selectedCategory ? "arrow-left" : "close"}
+            size={24}
+            color={theme.colors.onPrimary}
+          />
+        </TouchableOpacity>
 
-          <View style={styles.titleContainer}>
-            <Text style={[styles.headerTitle, { color: theme.colors.onSurface }]}>
-              {selectedCategory ? selectedCategory.label : 'Catégories'}
+        <View style={styles.titleContainer}>
+          <Text style={[styles.headerTitle]}>
+            {selectedCategory ? selectedCategory.label : 'Catégories'}
+          </Text>
+          {selectedCategory && (
+            <Text style={[styles.headerSubtitle]}>
+              Sélectionnez une sous-catégorie
             </Text>
-            {selectedCategory && (
-              <Text style={[styles.headerSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-                Sélectionnez une sous-catégorie
-              </Text>
-            )}
-          </View>
+          )}
         </View>
-      </Surface>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -135,22 +124,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
+    elevation: 0,
+    shadowColor: 'transparent',
+    borderWidth: 0,
+    shadowOpacity: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
     paddingVertical: 12,
+    backgroundColor: theme.colors.background,
   },
   backButton: {
     padding: 8,
     marginRight: 8,
     borderRadius: 20,
+    color: theme.colors.surface,
   },
   titleContainer: {
     flex: 1,
@@ -158,10 +149,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
+    paddingTop: 4,
+    color: theme.colors.surface,
   },
   headerSubtitle: {
     fontSize: 14,
     marginTop: 2,
+    color: theme.colors.surface,
   },
   scrollView: {
     flex: 1,
@@ -170,7 +164,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   categoriesContainer: {
-    padding: 16,
+    padding: 8,
   },
   categoriesGrid: {
     flexDirection: 'row',
@@ -180,30 +174,33 @@ const styles = StyleSheet.create({
   categoryItem: {
     width: '48%',
     marginBottom: 16,
+    backgroundColor: theme.colors.background,
   },
   categoryCard: {
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
+    elevation: 0,
+    shadowColor: 'transparent',
+    borderWidth: 0,
+    shadowOpacity: 0,
+    shadowOffset: { width: 0, height: 0 },
+    backgroundColor: theme.colors.background,
   },
   iconWrapper: {
     width: '100%',
     aspectRatio: 1,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
+    alignSelf: 'center',
   },
   categoryContent: {
-    padding: 12,
+    padding: 4,
   },
   categoryTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     marginBottom: 4,
+    marginTop: 8,
   },
   categorySubtitle: {
     fontSize: 13,

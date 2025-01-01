@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { useTheme, Text, Chip, Portal, Modal, List, Searchbar, IconButton } from 'react-native-paper';
+import { useTheme, Text, Portal, Modal, List, Searchbar, IconButton } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../hooks/useAuth';
 import CustomTextArea from '../components/forms/CustomTextArea';
 import CustomInput from '../components/forms/CustomInput';
 import CustomButton from '../components/forms/CustomButton';
+import CustomChip from '../components/CustomChip';
 import { userService } from '../services/userService';
 import { SERVICE_CATEGORIES, ServiceSubcategory } from '../constants/serviceCategories';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -164,27 +165,22 @@ const EditProfileScreen = () => {
             </Text>
             <View style={styles.skillsContainer}>
               {skills.map((skill, index) => (
-                <Chip
-                icon={() => <MaterialCommunityIcons name="tag" size={16} color={theme.colors.secondary} />}
-                key={index}
-                mode="flat"
-                onClose={() => handleRemoveSkill(skill.id)}
-                style={[styles.categoryChip, {
-                  backgroundColor: theme.colors.background,
-                  color: theme.colors.secondary
-                }]}
-              >
-                {skill.label}
-              </Chip>
+                <CustomChip
+                  key={index}
+                  icon="tag"
+                  text={skill.label}
+                  variant="secondary"
+                  size="medium"
+                  onPress={() => handleRemoveSkill(skill.id)}
+                />
               ))}
-              <Chip
+              <CustomChip
                 icon="plus"
+                text="Ajouter"
+                variant="outline"
+                size="medium"
                 onPress={() => setShowSkillsModal(true)}
-                style={styles.addChip}
-                textStyle={{ color: theme.colors.primary }}
-              >
-                Ajouter
-              </Chip>
+              />
             </View>
           </View>
 
