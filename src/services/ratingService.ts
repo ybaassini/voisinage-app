@@ -6,7 +6,6 @@ class RatingService {
 
   async addRating(rating: Omit<Rating, 'id' | 'createdAt'>): Promise<string> {
     try {
-      console.log('⭐️ Ajout d\'une nouvelle évaluation:', rating);
 
       const ratingData = {
         ...rating,
@@ -14,7 +13,6 @@ class RatingService {
       };
 
       const docRef = await db.collection(this.COLLECTION_NAME).add(ratingData);
-      console.log('✅ Évaluation ajoutée avec succès:', docRef.id);
 
       // Mettre à jour la note moyenne de l'utilisateur
       await this.updateUserAverageRating(rating.recipientId);

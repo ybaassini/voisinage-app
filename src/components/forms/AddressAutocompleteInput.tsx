@@ -38,7 +38,6 @@ const AddressAutocompleteInput: React.FC<AddressAutocompleteInputProps> = ({
       }
 
       const apiKey = 'AIzaSyAPfhW_pu0x_5XcOPb1FkvswBLkSfKjRWQ';
-      console.log(' Recherche d\'adresses pour:', input);
       
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(

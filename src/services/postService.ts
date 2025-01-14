@@ -11,7 +11,6 @@ class PostService {
   async createPost(userId: string, data: CreatePostData): Promise<string> {
     try {
       // Valider et géocoder l'adresse
-      console.log('🔍 Validation de l\'adresse:', data.location?.address);
       if (!data.location?.address) {
         throw new Error('L\'adresse est requise');
       }
@@ -32,8 +31,6 @@ class PostService {
         }
       };
 
-      console.log('📍 Localisation formatée:', location);
-
       const postData = {
         ...data,
         userId,
@@ -46,7 +43,6 @@ class PostService {
       };
 
       const docRef = await db.collection(this.COLLECTION_NAME).add(postData);
-      console.log('✅ Post créé avec succès:', docRef.id);
       return docRef.id;
     } catch (error) {
       console.error('Error creating post:', error);
@@ -94,36 +90,8 @@ class PostService {
     }
   }
 
-  async uploadPostImage(userId: string, imageUri: string): Promise<string> {
-    try {
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      const filename = `posts/${userId}/${Date.now()}.jpg`;
-      const storageRef = storage().ref(filename);
-
-      await storageRef.put(blob);
-      return await storageRef.getDownloadURL();
-    } catch (error) {
-      console.error('Error uploading post image:', error);
-      throw error;
-    }
-  }
-
-  async deletePostImage(imageUrl: string): Promise<void> {
-    try {
-      if (imageUrl) {
-        const storageRef = storage().refFromURL(imageUrl);
-        await storageRef.delete();
-      }
-    } catch (error) {
-      console.error('Error deleting post image:', error);
-      throw error;
-    }
-  }
-
   async getUserPosts(userId: string): Promise<Post[]> {
     try {
-      console.log('🔍 Récupération des posts de l\'utilisateur:', userId);
       
       // Créer la requête
       let query = db.collection(this.COLLECTION_NAME)
@@ -143,19 +111,12 @@ class PostService {
       // Mapper les résultats
       const posts = snapshot.docs.map(doc => {
         const data = doc.data();
-        console.log('📄 Post trouvé:', {
-          id: doc.id,
-          requestorId: data.requestor?.id,
-          title: data.title,
-          createdAt: data.createdAt
-        });
         return {
           id: doc.id,
           ...data
         };
       }) as Post[];
 
-      console.log('✅ Nombre de posts récupérés:', posts.length);
       return posts;
     } catch (error) {
       console.error('❌ Erreur lors de la récupération des posts:', error);
@@ -168,7 +129,6 @@ class PostService {
 
       const center = [latitude, longitude];
       const bounds = geohashQueryBounds(center, radiusInM);
-      console.log('Geohash bounds:', bounds);
 
       let posts: Post[] = [];
 
@@ -256,25 +216,17 @@ class PostService {
   }
 
   async uploadPostPhotos(postId: string, photoUris: string[]): Promise<string[]> {
-    console.log(`[PostService] Début de l'upload des photos pour le post ${postId}`);
-    console.log(`[PostService] Nombre de photos à uploader: ${photoUris.length}`);
     
     try {
       const uploadedPhotos = await Promise.all(
         photoUris.map(async (photoUri, index) => {
-          console.log(`[PostService] Upload de la photo ${index + 1}/${photoUris.length}`);
-          console.log(`[PostService] URI de la photo: ${photoUri}`);
           
           try {
             const fileName = storageService.generateUniqueFileName(photoUri);
-            console.log(`[PostService] Nom du fichier généré: ${fileName}`);
             
             const path = `posts/${postId}/${fileName}`;
-            console.log(`[PostService] Chemin de stockage: ${path}`);
             
             const url = await storageService.uploadImage(photoUri, path);
-            console.log(`[PostService] Photo ${index + 1} uploadée avec succès`);
-            console.log(`[PostService] URL de la photo: ${url}`);
             
             return url;
           } catch (error) {
@@ -286,15 +238,12 @@ class PostService {
 
       // Filtrer les photos qui n'ont pas pu être uploadées
       const successfullyUploadedPhotos = uploadedPhotos.filter((url): url is string => url !== null);
-      console.log(`[PostService] Nombre de photos uploadées avec succès: ${successfullyUploadedPhotos.length}/${photoUris.length}`);
 
       if (successfullyUploadedPhotos.length > 0) {
-        console.log(`[PostService] Mise à jour du post avec les URLs des photos`);
         // Mettre à jour le document du post avec les URLs des photos
         await this.updatePost(postId, {
           photos: successfullyUploadedPhotos
         });
-        console.log(`[PostService] Post mis à jour avec succès`);
       }
 
       return successfullyUploadedPhotos;

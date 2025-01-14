@@ -14,7 +14,6 @@ class GeocodingService {
 
   async validateAndGeocodeAddress(address: string): Promise<GeocodingResult> {
     try {
-      console.log('🔍 Validation et géocodage de l\'adresse:', address);
       
       if (!address || address.trim().length === 0) {
         throw new Error('L\'adresse ne peut pas être vide');
@@ -36,11 +35,6 @@ class GeocodingService {
       const result = data.results[0];
       const { lat, lng } = result.geometry.location;
       
-      console.log('✅ Adresse validée et géocodée:', {
-        formattedAddress: result.formatted_address,
-        coordinates: { latitude: lat, longitude: lng }
-      });
-
       return {
         coordinates: {
           latitude: lat,

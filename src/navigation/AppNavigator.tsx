@@ -227,10 +227,8 @@ const MainTabs = () => {
             tabPress: (e) => {
               // Prevent default navigation
               e.preventDefault();
-              console.log('Tab Press - Before setIsPostSheetVisible');
               // Show bottom sheet
               setIsPostSheetVisible(true);
-              console.log('Tab Press - After setIsPostSheetVisible');
             },
           }}
           options={{

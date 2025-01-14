@@ -44,7 +44,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setNotifications(fetchedNotifications);
       const unreadNotifications = fetchedNotifications.filter(n => !n.read).length;
       setUnreadCount(unreadNotifications);
-      await updateBadgeCount(unreadNotifications);
+      await updateBadgeCount();
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setError('Failed to load notifications');
@@ -59,7 +59,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const sendNotification = async (userId: string, title: string, message: string, data?: any) => {
     try {
-      await notificationService.sendNotification(userId, title, message, data);
+      await notificationService.createNotification({
+        userId,
+        title,
+        message,
+        data
+      });
       await loadNotifications();
     } catch (err) {
       console.error('Error sending notification:', err);
@@ -79,7 +84,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       );
       const newUnreadCount = unreadCount - 1;
       setUnreadCount(newUnreadCount);
-      await updateBadgeCount(newUnreadCount);
+      await updateBadgeCount();
     } catch (err) {
       console.error('Error marking notification as read:', err);
       throw err;
@@ -93,7 +98,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         prevNotifications.map(notification => ({ ...notification, read: true }))
       );
       setUnreadCount(0);
-      await updateBadgeCount(0);
+      await updateBadgeCount();
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
       throw err;

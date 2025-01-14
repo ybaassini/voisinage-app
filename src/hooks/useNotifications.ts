@@ -66,7 +66,7 @@ export const useNotifications = () => {
     }
 
     // Navigation basée sur le type de notification
-    if (data.type === 'message' && data.chatId) {
+    if (data.type === 'message' && data.conversationId) {
       // Navigation vers le chat
       // navigation.navigate('Chat', { chatId: data.chatId });
     } else if (data.type === 'request' && data.postId) {

@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, FieldValue } from '@react-native-firebase/firestore';
 
 export type MessageType = 'text' | 'image' | 'document';
 
@@ -15,8 +15,9 @@ export interface Message {
   senderAvatar?: string;
   recipientId: string;
   recipientName: string;
+  recipientAvatar?: string;
   postId?: string;
-  createdAt: Date;
+  createdAt: Date | Timestamp;
   read: boolean;
   readAt?: Date;
 }
@@ -33,7 +34,11 @@ export interface CreateMessageData {
   senderAvatar?: string;
   recipientId: string;
   recipientName: string;
+  recipientAvatar?: string;
   postId?: string;
+  createdAt: Date | Timestamp | FieldValue;
+  read: boolean;
+  readAt?: Date;
 }
 
 export interface Conversation {

@@ -1,3 +1,4 @@
+import { serverTimestamp } from '@react-native-firebase/firestore';
 import { db } from '../config/firebase';
 import { Notification } from '../types/notification';
 
@@ -8,7 +9,7 @@ class NotificationService {
     try {
       const notificationData = {
         ...notification,
-        createdAt: db.serverTimestamp(),
+        createdAt: serverTimestamp(),
         read: false
       };
 

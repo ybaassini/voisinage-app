@@ -10,7 +10,7 @@ import { theme } from '../theme/theme';
 import { userService } from '../services/userService';
 import { useChatContext } from '../contexts/ChatContext';
 import { Timestamp } from 'firebase/firestore';
-import { formatDate } from '../utils/dateUtils';
+import { convertToDate, formatDate } from '../utils/dateUtils';
 import { UserProfile } from '../types/user';
 
 const ConversationItem = ({
@@ -34,6 +34,15 @@ const ConversationItem = ({
 
   const displayName = otherParticipant.displayName || 'Utilisateur';
   const avatarLabel = displayName.substring(0, 2).toUpperCase();
+  console.log(
+    `📧 Conversation ${conversation.id}:`,
+    displayName,
+    conversation.lastMessage?.text,
+    conversation.lastMessage?.createdAt,
+    otherParticipant.avatar,
+    otherParticipant.displayName
+  );
+  
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.conversationItem}>
@@ -57,10 +66,12 @@ const ConversationItem = ({
             <Text variant="titleMedium">{displayName}</Text>
             {conversation.lastMessage && (
               <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                {formatDate(
-                  conversation.lastMessage.createdAt,
-                  'HH:mm'
-                )}
+                {convertToDate(
+                  conversation.lastMessage.createdAt
+                ).toLocaleString('fr-FR', {
+                  hour: 'numeric',
+                  minute: 'numeric',
+                })}
               </Text>
             )}
           </View>

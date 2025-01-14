@@ -22,21 +22,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
 
   const loadConversations = async () => {
-    console.log('🔄 ChatContext: Démarrage du chargement des conversations');
     
     if (!user?.uid) {
-      console.log('❌ ChatContext: Pas d\'utilisateur connecté, réinitialisation des conversations');
       setConversations([]);
       return;
     }
 
     try {
-      console.log('⏳ ChatContext: Début du chargement pour userId:', user.uid);
       setLoading(true);
       setError(null);
       
       const userConversations = await chatService.getUserConversations(user.uid, userProfile.displayName, userProfile.avatar);
-      console.log(`✅ ChatContext: ${userConversations.length} conversations chargées`);
       
       setConversations(userConversations);
     } catch (err) {
@@ -44,7 +40,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setError('Impossible de charger les conversations');
     } finally {
       setLoading(false);
-      console.log('🏁 ChatContext: Fin du processus de chargement');
     }
   };
 

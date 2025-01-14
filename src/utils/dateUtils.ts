@@ -71,6 +71,7 @@ export const convertToDate = (timestamp: any): Date => {
     if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
       return new Date(timestamp.seconds * 1000);
     }
+    console.log('timestamp', timestamp);
     
     console.warn('Format de date invalide, utilisation de la date actuelle');
     return new Date();
